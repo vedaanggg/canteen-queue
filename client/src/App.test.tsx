@@ -22,7 +22,7 @@ const barbers = [
 ];
 const salonStatus = (onlineJoiningOpen = true) => ({ isOpen: true, status: 'open', openingTime: '10:00', closingTime: '21:00', onlineJoiningOpen, onlineJoiningEnabled: true, waitingCount: 0, estimatedWaitMinutes: 0, currentTime: '12:00:00', timezone: 'Asia/Kolkata', override: null });
 
-function mockApi({ joiningOpen = true, onEstimate }: { joiningOpen?: boolean; onEstimate?: (ids: number[], barber: string) => object } = {}) {
+function mockApi({ joiningOpen = true, onEstimate, spotStatus = 'Waiting', previousDay = false }: { joiningOpen?: boolean; onEstimate?: (ids: number[], barber: string) => object; spotStatus?: string; previousDay?: boolean } = {}) {
   const methods: string[] = [];
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     methods.push(init?.method ?? 'GET');
@@ -36,6 +36,9 @@ function mockApi({ joiningOpen = true, onEstimate }: { joiningOpen?: boolean; on
       const barber = url.searchParams.get('barber') ?? 'any';
       body = onEstimate?.(ids, barber) ?? { serviceIds: ids, barber, totalMinutes: ids.reduce((sum, id) => sum + (services.find((service) => service.id === id)?.durationMinutes ?? 0), 0), totalPrice: ids.reduce((sum, id) => sum + (services.find((service) => service.id === id)?.price ?? 0), 0), waitingCount: 0, expectedWaitMinutes: 0 };
     }
+    const spot = { id: '5', token: 'S-5', tokenNumber: 5, tokenDay: '2026-11-24', name: 'Mira Patel', phone: '9876543210', barber: 'Ravi', status: spotStatus, services: [{ sourceServiceId: 1, nameEn: 'Haircut', nameGu: 'વાળ કપાવવું', durationMinutes: 30, price: 150 }], totalMinutes: 30, totalPrice: 150, createdAt: new Date().toISOString(), previousDay, readOnly: previousDay, position: spotStatus === 'Waiting' ? 1 : null, waitingCount: 1, expectedWaitMinutes: 0, isBarberOnBreak: false };
+    if (url.pathname === '/api/queue' && init?.method === 'POST') body = { spot, existing: false };
+    if (url.pathname === '/api/queue/5' && (!init?.method || init.method === 'GET')) body = { spot };
     return { ok: true, status: 200, json: async () => body } as Response;
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -57,13 +60,20 @@ describe('salon screens', () => {
     expect(screen.getAllByRole('link', { name: 'Join Queue' }).some((link) => link.getAttribute('href') === '/join')).toBe(true);
   });
 
+  it('shows a saved active spot on Home', async () => {
+    localStorage.setItem('salon-last-spot-id', '5');
+    mockApi(); renderAt('/');
+    const viewSpot = await screen.findByRole('link', { name: 'View your spot' });
+    expect(viewSpot.getAttribute('href')).toBe('/status/5');
+  });
+
   it('keeps Join Queue closed when the salon is closed or the owner switch is off', async () => {
     mockApi({ joiningOpen: false }); renderAt('/');
     expect(await screen.findByText('Online joining is closed right now. Please check back during salon hours.')).toBeTruthy();
     expect(screen.getAllByRole('link', { name: 'Join Queue' }).find((link) => link.getAttribute('aria-disabled') === 'true')).toBeTruthy();
   });
 
-  it('updates service totals live, caps selection at three, and shows the on-break barber as disabled', async () => {
+  it('updates service totals live, caps selection at three, and shows the on-break barber state', async () => {
     const user = userEvent.setup(); mockApi(); renderAt('/join');
     const haircut = await screen.findByRole('button', { name: /Haircut/ });
     await user.click(haircut);
@@ -78,10 +88,11 @@ describe('salon screens', () => {
     expect((await screen.findByText('You can select up to 3 services.')).textContent).toContain('You can select up to 3 services.');
     expect(screen.getByText('3 / 3')).toBeTruthy();
     const imran = screen.getByRole('button', { name: /Imran/ });
-    expect(imran).toHaveProperty('disabled', true);
+    expect(imran).toHaveProperty('disabled', false);
+    expect(imran.getAttribute('aria-pressed')).toBe('false');
   });
 
-  it('validates the 10-digit phone and does not create a queue spot on confirm', async () => {
+  it('validates the phone, joins with a request, and opens the status spot', async () => {
     const { methods } = mockApi(); const user = userEvent.setup(); renderAt('/join');
     await user.click(await screen.findByRole('button', { name: /Haircut/ }));
     await user.type(screen.getByLabelText('Your name'), 'Mira Patel');
@@ -91,8 +102,9 @@ describe('salon screens', () => {
     await user.clear(screen.getByLabelText('10-digit phone number'));
     await user.type(screen.getByLabelText('10-digit phone number'), '9876543210');
     await user.click(screen.getByRole('button', { name: 'Confirm' }));
-    expect((await screen.findByText('Joining the queue will be available in a later step.')).textContent).toContain('Joining the queue will be available in a later step.');
-    expect(methods).not.toContain('POST');
+    expect(await screen.findByText('S-5')).toBeTruthy();
+    expect(methods).toContain('POST');
+    expect(localStorage.getItem('salon-last-spot-id')).toBe('5');
   });
 
   it('switches the Home labels to Gujarati and remembers the language', async () => {
@@ -104,9 +116,25 @@ describe('salon screens', () => {
     expect(localStorage.getItem('salon-language')).toBe('gu');
   });
 
-  it('keeps the unrequested reception, barber, display, admin and status screens as placeholders', async () => {
+  it.each([
+    ['Called', 'It’s your turn!'],
+    ['In chair', 'Your service is in progress with'],
+    ['Done', 'Thank you! Your visit is complete.'],
+    ['No-show', 'This spot was released because you did not arrive in time.'],
+  ])('renders the %s status message', async (status, message) => {
+    mockApi({ spotStatus: status }); renderAt('/status/5');
+    expect(await screen.findByText(new RegExp(message))).toBeTruthy();
+  });
+
+  it('marks a previous-day spot read-only and omits its cancel action', async () => {
+    mockApi({ previousDay: true }); renderAt('/status/5');
+    expect(await screen.findByText('This spot is from a previous day. It is read-only.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Cancel my spot' })).toBeNull();
+  });
+
+  it('keeps the unrequested reception, barber, display and admin screens as placeholders', async () => {
     mockApi();
-    const cases: [string, string][] = [['/status/abc', 'Queue status'], ['/reception', 'Reception'], ['/barber/Mira', 'Barber workspace'], ['/display', 'Salon display'], ['/admin', 'Salon admin']];
+    const cases: [string, string][] = [['/reception', 'Reception'], ['/barber/Mira', 'Barber workspace'], ['/display', 'Salon display'], ['/admin', 'Salon admin']];
     for (const [path, title] of cases) {
       cleanup(); renderAt(path);
       expect(await screen.findByRole('heading', { name: title })).toBeTruthy();

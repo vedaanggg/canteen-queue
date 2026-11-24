@@ -33,6 +33,35 @@ export async function initializeDatabase() {
       id INTEGER PRIMARY KEY CHECK (id = 1),
       online_joining_enabled INTEGER NOT NULL DEFAULT 1 CHECK (online_joining_enabled IN (0, 1))
     );
+    CREATE TABLE IF NOT EXISTS queue_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      token_day TEXT NOT NULL,
+      token_number INTEGER NOT NULL,
+      token TEXT NOT NULL,
+      request_id TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      phone TEXT NOT NULL,
+      barber TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('Waiting', 'Called', 'In chair', 'Done', 'No-show', 'Cancelled')),
+      total_minutes INTEGER NOT NULL,
+      total_price INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      status_updated_at TEXT NOT NULL,
+      UNIQUE(token_day, token_number)
+    );
+    CREATE TABLE IF NOT EXISTS queue_entry_services (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      queue_entry_id INTEGER NOT NULL REFERENCES queue_entries(id) ON DELETE CASCADE,
+      source_service_id INTEGER NOT NULL,
+      name_en TEXT NOT NULL,
+      name_gu TEXT NOT NULL,
+      duration_minutes INTEGER NOT NULL,
+      price INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS queue_token_counters (
+      token_day TEXT PRIMARY KEY,
+      last_number INTEGER NOT NULL
+    );
     INSERT OR IGNORE INTO salon_settings (id, online_joining_enabled) VALUES (1, 1);
   `);
   seedServicesIfEmpty();
@@ -80,6 +109,8 @@ export function getOnlineJoiningEnabled() {
   const result = queryRows('SELECT online_joining_enabled AS enabled FROM salon_settings WHERE id = 1')[0];
   return Boolean(Number(result?.enabled ?? 1));
 }
+
+export function getDatabase() { return db; }
 
 export function persistDatabase() {
   if (!db) return;

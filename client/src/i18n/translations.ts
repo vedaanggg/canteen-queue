@@ -14,6 +14,12 @@ const english = {
   selected: 'Selected', duration: 'Duration', price: 'Price', summary: 'Your estimate', totalTime: 'Total service time', totalPrice: 'Total price', expectedWaitLabel: 'Expected wait',
   confirm: 'Confirm', requiredName: 'Please enter your name.', invalidPhone: 'Enter a valid 10-digit phone number.', selectOneService: 'Select at least one service.', maxThreeServices: 'You can select up to 3 services.',
   estimateLoading: 'Updating estimate…', estimateError: 'Could not update the estimate. Try again.', selectServicePrompt: 'Choose a service to see your estimate.', detailsValid: 'Your details are ready.', joiningNextStep: 'Joining the queue will be available in a later step.',
+  joining: 'Joining…', joinFailed: 'Could not join the queue. Try again.', alreadyInQueue: 'You are already in the queue.', viewSpot: 'View your spot',
+  loadingSpot: 'Loading your queue status…', spotError: 'We could not load this spot.', spotNotFound: 'Spot not found', retrySpot: 'Try again', reconnecting: 'Reconnecting…',
+  yourToken: 'Your token', position: 'in line', peopleAhead: 'people ahead', estimatedWaitLabelStatus: 'Estimated wait', youreNext: "You're next", startComing: 'Start coming to the salon',
+  yourDetails: 'Your queue details', chosenServices: 'Services', preferredBarber: 'Barber', anyBarberStatus: 'Any barber', barberOnBreak: 'is on break', previousDay: 'This spot is from a previous day. It is read-only.',
+  waiting: 'Waiting', called: 'It’s your turn!', goToBarber: 'Go to', inChair: 'Your service is in progress with', done: 'Thank you! Your visit is complete.', noShow: 'This spot was released because you did not arrive in time.', cancelled: 'Your spot has been cancelled.',
+  cancelSpot: 'Cancel my spot', cancelConfirm: 'Cancel your queue spot?', cancel: 'Cancel', keepSpot: 'Keep my spot', joinAgain: 'Join again', notAvailable: 'No active wait estimate is available.',
 } as const;
 
 export type TranslationKey = keyof typeof english;
@@ -34,6 +40,12 @@ export const translations: Record<Language, Dictionary> = {
     selected: 'પસંદ કરેલી', duration: 'સમય', price: 'કિંમત', summary: 'તમારો અંદાજ', totalTime: 'કુલ સેવા સમય', totalPrice: 'કુલ કિંમત', expectedWaitLabel: 'અંદાજિત રાહ',
     confirm: 'ખાતરી કરો', requiredName: 'કૃપા કરીને તમારું નામ લખો.', invalidPhone: 'માન્ય 10 અંકનો ફોન નંબર લખો.', selectOneService: 'ઓછામાં ઓછી એક સેવા પસંદ કરો.', maxThreeServices: 'તમે વધુમાં વધુ 3 સેવાઓ પસંદ કરી શકો છો.',
     estimateLoading: 'અંદાજ અપડેટ થઈ રહ્યો છે…', estimateError: 'અંદાજ અપડેટ થઈ શક્યો નથી. ફરી પ્રયાસ કરો.', selectServicePrompt: 'અંદાજ જોવા માટે સેવા પસંદ કરો.', detailsValid: 'તમારી માહિતી તૈયાર છે.', joiningNextStep: 'કતારમાં જોડાવાની સુવિધા આગળના પગલામાં આવશે.',
+    joining: 'જોડાઈ રહ્યા છીએ…', joinFailed: 'કતારમાં જોડાઈ શકાયું નથી. ફરી પ્રયાસ કરો.', alreadyInQueue: 'તમે પહેલેથી કતારમાં છો.', viewSpot: 'તમારી જગ્યા જુઓ',
+    loadingSpot: 'કતારની સ્થિતિ લોડ થઈ રહી છે…', spotError: 'આ જગ્યા લોડ થઈ શકી નથી.', spotNotFound: 'જગ્યા મળી નથી', retrySpot: 'ફરી પ્રયાસ કરો', reconnecting: 'ફરી જોડાઈ રહ્યું છે…',
+    yourToken: 'તમારો ટોકન', position: 'કતારમાં', peopleAhead: 'લોકો આગળ છે', estimatedWaitLabelStatus: 'અંદાજિત રાહ', youreNext: 'તમારો વારો હવે છે', startComing: 'સેલોન તરફ આવવાનું શરૂ કરો',
+    yourDetails: 'કતારની વિગતો', chosenServices: 'સેવાઓ', preferredBarber: 'વાળંદ', anyBarberStatus: 'કોઈપણ વાળંદ', barberOnBreak: 'વિરામ પર છે', previousDay: 'આ જગ્યા અગાઉના દિવસની છે. તે ફક્ત વાંચી શકાય છે.',
+    waiting: 'રાહમાં', called: 'તમારો વારો છે!', goToBarber: 'આ વાળંદ પાસે જાઓ:', inChair: 'તમારી સેવા ચાલુ છે:', done: 'આભાર! તમારી મુલાકાત પૂર્ણ થઈ.', noShow: 'સમયસર ન આવવાથી તમારી જગ્યા મુક્ત કરવામાં આવી.', cancelled: 'તમારી જગ્યા રદ થઈ છે.',
+    cancelSpot: 'મારી જગ્યા રદ કરો', cancelConfirm: 'તમારી કતારની જગ્યા રદ કરવી છે?', cancel: 'રદ કરો', keepSpot: 'જગ્યા રાખો', joinAgain: 'ફરી જોડાઓ', notAvailable: 'હાલ રાહનો અંદાજ ઉપલબ્ધ નથી.',
   },
 };
 

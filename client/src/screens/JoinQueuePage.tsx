@@ -1,12 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
-import { ApiError, fetchQueueEstimate, type QueueEstimate } from '../lib/api';
+import { Link, useNavigate } from 'react-router-dom';
+import { ApiError, createQueueSpot, fetchQueueEstimate, type QueueEstimate } from '../lib/api';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useSalonData } from '../state/useSalonData';
 
 const money = (value: number) => `₹${value.toLocaleString('en-IN')}`;
 
 export default function JoinQueuePage() {
+  const navigate = useNavigate();
   const { language, t } = useLanguage();
   const { services, barbers, status, loading, error, refresh } = useSalonData();
   const [name, setName] = useState('');
@@ -18,6 +19,8 @@ export default function JoinQueuePage() {
   const [estimateError, setEstimateError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [joining, setJoining] = useState(false);
+  const [existingSpotId, setExistingSpotId] = useState<string | null>(null);
   const joinOpen = status?.onlineJoiningOpen ?? false;
 
   useEffect(() => {
@@ -37,13 +40,22 @@ export default function JoinQueuePage() {
     setSelectedServices([...selectedServices, serviceId]);
   }
 
-  function confirm(event: FormEvent<HTMLFormElement>) {
+  async function confirm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setSubmitted(true); setFormError(null);
     if (!name.trim()) { setFormError(t('requiredName')); return; }
     if (!/^\d{10}$/.test(phone.trim())) { setFormError(t('invalidPhone')); return; }
     if (!selectedServices.length) { setFormError(t('selectOneService')); return; }
     if (!joinOpen) { setFormError(status?.isOpen ? t('joiningClosedMessage') : t('salonClosedMessage')); return; }
-    setFormError(t('joiningNextStep'));
+    setJoining(true);
+    try {
+      const requestId = globalThis.crypto?.randomUUID?.() ?? 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => { const random = Math.random() * 16 | 0; return (char === 'x' ? random : (random & 3 | 8)).toString(16); });
+      const result = await createQueueSpot({ name: name.trim(), phone: phone.trim(), serviceIds: selectedServices, barber: selectedBarber, requestId });
+      localStorage.setItem('salon-last-spot-id', result.spot.id);
+      if (result.existing) { setExistingSpotId(result.spot.id); setFormError(result.message ?? t('alreadyInQueue')); }
+      else navigate(`/status/${encodeURIComponent(result.spot.id)}`);
+    } catch (cause) {
+      setFormError(cause instanceof ApiError ? cause.message : cause instanceof Error ? cause.message : t('joinFailed'));
+    } finally { setJoining(false); }
   }
 
   if (loading) return <main className="mx-auto flex min-h-[65vh] max-w-4xl items-center justify-center px-4"><p role="status" className="animate-pulse text-lg font-semibold text-slate-200">{t('loadingSalon')}</p></main>;
@@ -57,6 +69,7 @@ export default function JoinQueuePage() {
     </div>
 
     {!joinOpen && <div role="status" className="mb-5 rounded-2xl border border-amber-300/20 bg-amber-200/10 px-4 py-3 text-amber-100">{status.isOpen ? t('joiningClosedMessage') : t('salonClosedMessage')}</div>}
+    {existingSpotId && <div role="status" className="mb-5 rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-amber-100">{formError}<Link className="ml-2 inline-flex min-h-11 items-center font-extrabold text-gold underline" to={`/status/${existingSpotId}`}>{t('viewSpot')}</Link></div>}
     {services.length === 0 ? <section className="rounded-3xl border border-dashed border-white/20 px-5 py-12 text-center text-slate-300">{t('noServices')}</section> : <form onSubmit={confirm} noValidate className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(19rem,0.7fr)]">
       <div className="space-y-5">
         <section className="rounded-3xl border border-white/10 bg-white/[0.06] p-4 sm:p-6">
@@ -85,8 +98,8 @@ export default function JoinQueuePage() {
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <button type="button" aria-pressed={selectedBarber === 'any'} onClick={() => { setSelectedBarber('any'); setFormError(null); }} className={`flex min-h-16 items-center gap-3 rounded-2xl border p-3 text-left font-bold transition ${selectedBarber === 'any' ? 'border-gold bg-gold/10 text-white' : 'border-white/10 bg-charcoal/70 text-slate-200'}`}><span aria-hidden="true" className="text-2xl">✦</span>{t('anyBarber')}</button>
             {barbers.map((barber) => {
-              const unavailable = barber.status === 'on_break'; const selected = selectedBarber.toLowerCase() === barber.name.toLowerCase();
-              return <button key={barber.id} type="button" disabled={unavailable} aria-pressed={selected} onClick={() => { setSelectedBarber(barber.name); setFormError(null); }} className={`flex min-h-16 items-center gap-3 rounded-2xl border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-55 ${selected ? 'border-gold bg-gold/10' : 'border-white/10 bg-charcoal/70'}`}>
+              const selected = selectedBarber.toLowerCase() === barber.name.toLowerCase();
+              return <button key={barber.id} type="button" aria-pressed={selected} onClick={() => { setSelectedBarber(barber.name); setFormError(null); }} className={`flex min-h-16 items-center gap-3 rounded-2xl border p-3 text-left transition ${selected ? 'border-gold bg-gold/10' : 'border-white/10 bg-charcoal/70'}`}>
                 <span aria-hidden="true" className="text-2xl">{barber.avatar}</span><span className="min-w-0 flex-1 break-words font-bold text-white">{barber.name}</span>
                 <span className={`max-w-24 break-words rounded-full px-2 py-1 text-[11px] font-bold ${barber.status === 'free' ? 'bg-emerald-400/15 text-emerald-300' : barber.status === 'busy' ? 'bg-amber-400/15 text-amber-200' : 'bg-slate-500/30 text-slate-300'}`}>{t(barber.status === 'on_break' ? 'onBreak' : barber.status)}</span>
               </button>;
@@ -106,8 +119,8 @@ export default function JoinQueuePage() {
           <div className="flex justify-between gap-3 text-sm"><dt className="text-slate-300">{t('totalPrice')}</dt><dd className="shrink-0 font-extrabold text-gold">{money(estimate.totalPrice)}</dd></div>
           <div className="flex justify-between gap-3 border-t border-white/10 pt-3 text-sm"><dt className="text-slate-300">{t('expectedWaitLabel')}</dt><dd className="shrink-0 font-extrabold text-white">{estimate.expectedWaitMinutes} {t('minutes')}</dd></div>
         </dl>}
-        {formError && <p role={submitted ? 'alert' : 'status'} className="mt-4 break-words rounded-xl bg-amber-300/10 px-3 py-2.5 text-sm font-semibold text-amber-100">{formError}</p>}
-        <button type="submit" disabled={!joinOpen} className="mt-5 min-h-12 w-full rounded-2xl bg-gold px-5 font-extrabold text-charcoal transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400">{t('confirm')}</button>
+        {formError && !existingSpotId && <p role={submitted ? 'alert' : 'status'} className="mt-4 break-words rounded-xl bg-amber-300/10 px-3 py-2.5 text-sm font-semibold text-amber-100">{formError}</p>}
+        <button type="submit" disabled={!joinOpen || joining} className="mt-5 min-h-12 w-full rounded-2xl bg-gold px-5 font-extrabold text-charcoal transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400">{joining ? t('joining') : t('confirm')}</button>
       </aside>
     </form>}
   </main>;

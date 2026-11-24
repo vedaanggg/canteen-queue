@@ -1,10 +1,28 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { fetchQueueSpot } from '../lib/api';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useSalonData } from '../state/useSalonData';
 
 export default function HomePage() {
   const { t } = useLanguage();
   const { barbers, status, loading, error, refresh } = useSalonData();
+  const [activeSpotId, setActiveSpotId] = useState<string | null>(null);
+  useEffect(() => {
+    let disposed = false;
+    const check = async () => {
+      const savedId = localStorage.getItem('salon-last-spot-id');
+      if (!savedId) { setActiveSpotId(null); return; }
+      try {
+        const result = await fetchQueueSpot(savedId);
+        if (!disposed && activeStatuses.has(result.spot.status) && !result.spot.previousDay) setActiveSpotId(result.spot.id);
+        else if (!disposed) setActiveSpotId(null);
+      } catch { if (!disposed) setActiveSpotId(null); }
+    };
+    void check();
+    const timer = window.setInterval(() => void check(), 30_000);
+    return () => { disposed = true; window.clearInterval(timer); };
+  }, []);
   if (loading) return <main className="mx-auto flex min-h-[65vh] max-w-5xl items-center justify-center px-4"><p role="status" className="animate-pulse text-lg font-semibold text-slate-200">{t('loadingSalon')}</p></main>;
   if (error || !status) return <main className="mx-auto flex min-h-[65vh] max-w-xl flex-col items-center justify-center px-4 text-center"><h1 className="text-2xl font-extrabold text-white">{t('loadErrorTitle')}</h1><p className="mt-3 text-slate-300">{error}</p><button onClick={() => void refresh()} className="mt-5 min-h-11 rounded-full bg-gold px-5 font-bold text-charcoal">{t('retry')}</button></main>;
   const joinOpen = status.onlineJoiningOpen;
@@ -20,6 +38,7 @@ export default function HomePage() {
         <h1 className="max-w-2xl break-words text-4xl font-black leading-tight text-white sm:text-6xl">{t('homeTitle')}</h1>
         <div className="mt-7 flex flex-wrap items-center gap-3">
           <Link aria-disabled={!joinOpen} to={joinOpen ? '/join' : '#join-closed'} onClick={(event) => { if (!joinOpen) event.preventDefault(); }} className={`inline-flex min-h-14 items-center justify-center rounded-2xl px-7 text-lg font-black shadow-lg transition ${joinOpen ? 'bg-gold text-charcoal shadow-gold/15 hover:bg-amber-300' : 'cursor-not-allowed bg-slate-700 text-slate-400 shadow-none'}`}>{t('joinQueue')}</Link>
+          {activeSpotId && <Link to={`/status/${encodeURIComponent(activeSpotId)}`} className="inline-flex min-h-14 items-center justify-center rounded-2xl border border-gold px-6 text-base font-extrabold text-gold">{t('viewSpot')}</Link>}
           {!joinOpen && <p id="join-closed" role="status" className="w-full break-words text-sm font-semibold text-amber-200">{status.isOpen ? t('joiningClosedMessage') : t('salonClosedMessage')}</p>}
         </div>
       </div>
@@ -43,3 +62,5 @@ export default function HomePage() {
     </section>
   </main>;
 }
+
+const activeStatuses = new Set(['Waiting', 'Called', 'In chair']);

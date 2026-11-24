@@ -1,8 +1,8 @@
 # Salon API plan
 
 This API evolves incrementally. The health check, salon catalog, opening and
-joining status, and queue estimate are implemented. Queue entries and all
-Reception, Barber, Display, and Admin workflows remain planned.
+joining status, queue estimate, customer joining, status and cancellation are
+implemented. Reception, Barber, Display, and Admin workflows remain planned.
 
 ## Environment
 
@@ -24,15 +24,17 @@ Reception, Barber, Display, and Admin workflows remain planned.
 | GET | `/api/barbers` | List on-duty barbers and their status. | Implemented |
 | GET | `/api/status` | Return salon hours, joining availability, and wait summary. | Implemented |
 | GET | `/api/queue/estimate?serviceIds=1,2&barber=any` | Validate selected services and return totals and wait estimate. | Implemented |
-| POST | `/api/queue` | Create a queue entry after confirmation. | Planned; not created in this step |
-| GET | `/api/queue/:id` | Return an individual's queue status. | Planned |
+| POST | `/api/queue` | Create a customer spot, or return the existing spot for a repeated request UUID/active phone. | Implemented |
+| GET | `/api/queue/:id` | Return the spot, saved service snapshot, position, estimated wait, barber-break and previous-day flags. | Implemented |
+| POST | `/api/queue/:id/cancel` | Cancel a same-day Waiting spot. | Implemented |
 | GET | `/api/reception/queue` | Reception queue view. | Planned |
 | GET | `/api/barbers/:name/queue` | Barber queue view. | Planned |
 | GET | `/api/display` | Public salon waiting display data. | Planned |
 | GET/POST/PATCH/DELETE | `/api/admin/*` | Salon services, barber, and setting management. | Planned |
 
-The estimate endpoint and Join screen do not create queue entries. Unknown
-`/api` routes return HTTP 404. Future route payloads and staff authorization
+The Join screen creates spots through `POST /api/queue`. Queue status transitions
+to Called, In chair, Done or No-show are intentionally not exposed yet. Unknown
+`/api` routes return HTTP 404. Future staff route payloads and authorization
 must be finalized before implementation.
 
 ## SQLite tables
@@ -42,14 +44,21 @@ must be finalized before implementation.
 - `barbers`: name, emoji avatar, on-duty switch, and status (`free`, `busy`, or
   `on_break`). Ravi, Amit, and Imran are seeded if empty; Imran is on break.
 - `salon_settings`: singleton owner switch for online joining, enabled by
-  default. No queue-entry table exists yet.
+  default.
+- `queue_entries`: daily token, unique client request UUID, customer details,
+  preferred barber, status, totals and timestamps. A partial active spot is
+  checked for the same phone on the current salon day.
+- `queue_entry_services`: immutable English/Gujarati name, duration and price
+  snapshot for each service selected when joining.
+- `queue_token_counters`: last token number per salon-local calendar day, so
+  tokens restart daily and cancelled tokens are not reused.
 
 ## Socket.IO events
 
 | Direction | Event | Payload | Status |
 | --- | --- | --- | --- |
 | Server → client | `connection:ready` | `{ "connected": true }` | Implemented |
-| Server → clients | `queue:updated` | To be defined with queue lifecycle requirements. | Planned |
+| Server → clients | `queue:updated` | `{ action: "joined" | "cancelled", id, token, status }` | Implemented for customer join/cancel |
 | Server → clients | `salon:updated` | To be defined with salon settings requirements. | Planned |
 
 Socket.IO CORS uses `CLIENT_ORIGIN`; the browser connects through
@@ -72,7 +81,36 @@ and online-joining status open or closed.
 
 `GET /api/queue/estimate` takes comma-separated `serviceIds` and a `barber`
 name or `any`. It validates 1–3 distinct enabled service IDs and rejects
-unknown/off-duty or on-break barbers. The response includes `serviceIds`,
-`barber`, `totalMinutes`, `totalPrice`, `waitingCount`, and
-`expectedWaitMinutes`. Until queue entries are implemented, waiting count and
-expected wait are zero.
+unknown/off-duty barbers. An on-duty barber on break may be selected; the spot
+reports that break state. The response includes `serviceIds`, `barber`,
+`totalMinutes`, `totalPrice`, `waitingCount`, and `expectedWaitMinutes`.
+
+`POST /api/queue` accepts `{ name, phone, serviceIds, barber, requestId }`.
+The request ID must be a UUID; `barber` is a duty barber name or `any`. The
+backend validates the phone and selected services, calculates totals from the
+current catalog, checks the online joining rule, allocates an IST-day token in
+one transaction, and snapshots the selected service details. It returns
+`{ spot, existing, message? }` with HTTP 201 for a new spot or HTTP 200 when
+the request UUID or phone already has an active spot that day. Errors use
+`{ error, code }`.
+
+`GET /api/queue/:id` returns `{ spot }`. Spot fields include `id`, `token`,
+`tokenDay`, `name`, `phone`, `barber`, `status`, `services`, totals,
+`position`, `waitingCount`, `expectedWaitMinutes`, `isBarberOnBreak`,
+`previousDay`, and `readOnly`. A previous-day spot retains its saved status,
+has no live position/wait, and cannot be cancelled.
+
+`POST /api/queue/:id/cancel` returns `{ spot }` and only changes a same-day
+Waiting spot to final status `Cancelled`. Other statuses and previous-day spots
+return HTTP 409.
+
+Wait estimates use the rule in `queueRulesService.js`: service minutes ahead
+plus remaining time for Called/In chair work, divided by active working barbers
+for Any; a specific barber uses that barber's eligible queue and current work.
+Positive estimates round up to the next 5 minutes; zero remains zero. The queue
+is initially empty, so estimates start at zero.
+
+On creation and cancellation the server emits `queue:updated` with
+`{ action: "joined" | "cancelled", id, token, status }`. The client listens
+for matching spot IDs and uses 5-second polling while disconnected. No events
+are emitted for future staff-driven status changes until those routes exist.
