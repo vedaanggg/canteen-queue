@@ -1,6 +1,10 @@
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { socket } from './lib/socket';
+import CartPage from './screens/CartPage';
+import MenuPage from './screens/MenuPage';
+import { CartProvider } from './state/CartContext';
+import { CanteenDataProvider } from './state/CanteenDataContext';
 
 const apiUrl = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '');
 
@@ -56,6 +60,16 @@ function HealthStatus() {
 }
 
 export default function App() {
+  return (
+    <CanteenDataProvider>
+      <CartProvider>
+        <AppShell />
+      </CartProvider>
+    </CanteenDataProvider>
+  );
+}
+
+function AppShell() {
   const location = useLocation();
   const isDisplay = location.pathname === '/display';
 
@@ -76,8 +90,8 @@ export default function App() {
         </header>
       )}
       <Routes>
-        <Route path="/" element={<PlaceholderPage title="Menu" />} />
-        <Route path="/cart" element={<PlaceholderPage title="Cart" />} />
+        <Route path="/" element={<MenuPage />} />
+        <Route path="/cart" element={<CartPage />} />
         <Route path="/order/:id" element={<PlaceholderPage title="Order status" />} />
         <Route path="/kitchen" element={<PlaceholderPage title="Kitchen board" />} />
         <Route path="/display" element={<PlaceholderPage title="Now serving" />} />

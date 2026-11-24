@@ -50,7 +50,66 @@ export async function initializeDatabase() {
     line_total INTEGER NOT NULL
   );
 `);
+  ensureMenuItemColumn('emoji', "TEXT NOT NULL DEFAULT '🍽️'");
+  seedMenuIfEmpty();
   persistDatabase();
+}
+
+function ensureMenuItemColumn(name, definition) {
+  const columns = db.exec('PRAGMA table_info(menu_items)')[0]?.values ?? [];
+  const exists = columns.some((column) => column[1] === name);
+  if (!exists) db.run(`ALTER TABLE menu_items ADD COLUMN ${name} ${definition}`);
+}
+
+const seedItems = [
+  ['Samosa', 'Snacks', 20, 1, 'Crisp pastry with spiced potato filling.', '🥟', 1],
+  ['Vada Pav', 'Snacks', 30, 1, 'Mumbai-style potato fritter in a soft pav.', '🍔', 1],
+  ['Paneer Pakora', 'Snacks', 55, 1, 'Golden paneer fritters with mint chutney.', '🧀', 1],
+  ['Chicken Roll', 'Snacks', 80, 0, 'Spiced chicken wrapped in a flaky paratha.', '🌯', 1],
+  ['Masala Dosa', 'Meals', 70, 1, 'Crisp dosa filled with masala potato.', '🥞', 1],
+  ['Veg Thali', 'Meals', 100, 1, 'Rice, dal, seasonal sabzi, roti and pickle.', '🍛', 1],
+  ['Paneer Rice Bowl', 'Meals', 110, 1, 'Jeera rice topped with creamy paneer curry.', '🍲', 1],
+  ['Chicken Biryani', 'Meals', 130, 0, 'Fragrant rice layered with spiced chicken.', '🍗', 1],
+  ['Egg Fried Rice', 'Meals', 90, 0, 'Wok-tossed rice with egg and vegetables.', '🍚', 1],
+  ['Masala Chai', 'Beverages', 15, 1, 'Strong tea brewed with ginger and spices.', '☕', 1],
+  ['Cold Coffee', 'Beverages', 50, 1, 'Chilled coffee blended with milk.', '🥤', 1],
+  ['Mango Lassi', 'Beverages', 45, 1, 'Sweet yogurt drink with mango.', '🥭', 1],
+  ['Nimbu Pani', 'Beverages', 25, 1, 'Fresh lime, mint and a pinch of chaat masala.', '🍋', 1],
+  ['Bottled Water', 'Beverages', 20, 1, 'Chilled 500 ml drinking water.', '💧', 0],
+  ['Gulab Jamun', 'Desserts', 25, 1, 'Warm milk-solid dumplings in sugar syrup.', '🍡', 1],
+  ['Kheer Cup', 'Desserts', 35, 1, 'Rice pudding finished with cardamom.', '🍮', 1],
+  ['Chocolate Brownie', 'Desserts', 50, 1, 'Fudgy chocolate brownie baked fresh.', '🍫', 1],
+  ['Malai Kulfi', 'Desserts', 30, 1, 'Creamy cardamom kulfi on a stick.', '🍦', 0],
+  ['Fruit Custard', 'Desserts', 40, 1, 'Seasonal fruit folded through vanilla custard.', '🍓', 1],
+];
+
+function seedMenuIfEmpty() {
+  const row = db.exec('SELECT COUNT(*) FROM menu_items')[0];
+  const count = Number(row?.values?.[0]?.[0] ?? 0);
+  if (count > 0) return;
+
+  const insert = db.prepare(`
+    INSERT INTO menu_items
+      (name, category, price, is_vegetarian, description, emoji, is_available)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+  try {
+    for (const item of seedItems) insert.run(item);
+  } finally {
+    insert.free();
+  }
+}
+
+export function queryRows(sql, params = []) {
+  const statement = db.prepare(sql);
+  try {
+    statement.bind(params);
+    const rows = [];
+    while (statement.step()) rows.push(statement.getAsObject());
+    return rows;
+  } finally {
+    statement.free();
+  }
 }
 
 export function persistDatabase() {

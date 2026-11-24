@@ -1,8 +1,8 @@
 # API, database, and realtime plan
 
-This document describes the planned application contract. Step 1 implements
-only the health endpoint and initial SQLite tables; the other endpoints and
-events will be added in later steps and this document will be updated with them.
+This document describes the application contract. Endpoints and events are
+marked implemented when they are available in the code; future-step contracts
+remain marked planned.
 
 ## Environment
 
@@ -13,14 +13,17 @@ events will be added in later steps and this document will be updated with them.
 - `DATABASE_PATH`: SQLite file path, resolved from the server working directory
   (local default: `./data/canteen.sqlite`).
 - `CANTEEN_TIMEZONE`: timezone for all canteen time rules.
+- `ORDERING_STATUS_OVERRIDE`: optional `open` or `closed` override for testing.
+  Omit or leave blank to follow the configured timezone schedule. Any other
+  non-empty value makes the backend fail on startup rather than silently ignore it.
 
 ## HTTP endpoints
 
 | Method | Path | Purpose | Status |
 | --- | --- | --- | --- |
 | GET | `/api/health` | Confirm the backend and SQLite are available. Returns `{ "status": "ok", "service": "canteen-queue-api" }`. | Implemented in Step 1 |
-| GET | `/api/status` | Return ordering availability and current canteen time. | Planned |
-| GET | `/api/menu` | Return available menu items and categories. | Planned |
+| GET | `/api/status` | Return ordering availability and current canteen time. | Implemented |
+| GET | `/api/menu` | Return menu items, including sold-out items, and categories. | Implemented |
 | POST | `/api/orders` | Create an order with an idempotency request ID; server validates and calculates prices/totals. | Planned |
 | GET | `/api/orders/:id` | Return order details and saved status. | Planned |
 | PATCH | `/api/orders/:id/status` | Advance an order through valid staff status transitions. | Planned |
@@ -30,8 +33,9 @@ events will be added in later steps and this document will be updated with them.
 
 ## SQLite tables
 
-- `menu_items`: menu name, category, rupee price, description, veg flag,
-  availability, and creation/update timestamps.
+- `menu_items`: menu name, category, whole-rupee price, description, emoji,
+  veg flag, availability, and creation/update timestamps. If empty at startup,
+  the backend seeds 19 sample canteen items across the four fixed categories.
 - `orders`: UUID order ID, unique request ID, daily token, IST service day,
   student and roll details, status, total, and timestamps. Token numbers are
   unique within a service day.
@@ -49,3 +53,42 @@ events will be added in later steps and this document will be updated with them.
 | Server → clients | `order:cancelled` | Cancelled order ID and status. | Remove cancelled orders from active views. | Planned |
 
 Event payload details will be finalized alongside their corresponding features.
+
+## Implemented response shapes
+
+### `GET /api/menu`
+
+Returns HTTP 200:
+
+```json
+{
+  "categories": ["Snacks", "Meals", "Beverages", "Desserts"],
+  "items": [
+    {
+      "id": 1,
+      "name": "Samosa",
+      "category": "Snacks",
+      "price": 20,
+      "description": "Crisp pastry with spiced potato filling.",
+      "emoji": "🥟",
+      "isVegetarian": true,
+      "isAvailable": true
+    }
+  ]
+}
+```
+
+Sold-out items are included with `isAvailable: false` so the menu can show them
+disabled. The client combines category and name filtering locally.
+
+### `GET /api/status`
+
+Returns HTTP 200 with `isOpen`, `status` (`open` or `closed`), `openingTime`
+(`09:00`), `orderingCutoff` (`16:45`), `canteenClosingTime` (`17:00`),
+`currentTime` in `timezone`, and `override` (`open`, `closed`, or `null`).
+Opening and cutoff decisions use the configured timezone. The cutoff is exclusive:
+ordering is closed at 4:45:00 PM. A test override takes precedence over the clock.
+
+The frontend requests `/api/menu` and `/api/status` from `VITE_API_URL`. It
+refreshes status every 30 seconds and refetches menu data on `menu:updated`.
+No order creation endpoint is called from the Cart screen in this step.
