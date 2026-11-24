@@ -34,6 +34,19 @@ describe('salon API scaffold', () => {
     expect(response.status).toBe(404);
   });
 
+  it('protects every reception endpoint and staff logout without a bearer token', async () => {
+    const requests = [
+      fetch(`${baseUrl}/api/reception`),
+      fetch(`${baseUrl}/api/reception/walk-in`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }),
+      fetch(`${baseUrl}/api/reception/call-next`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }),
+      fetch(`${baseUrl}/api/reception/1/cancel`, { method: 'POST' }),
+      fetch(`${baseUrl}/api/reception/1/no-show`, { method: 'POST' }),
+      fetch(`${baseUrl}/api/staff/logout`, { method: 'POST' }),
+    ];
+    const responses = await Promise.all(requests);
+    expect(responses.map((response) => response.status)).toEqual([401, 401, 401, 401, 401, 401]);
+  });
+
   it('serves six bilingual services and only the on-duty barber roster', async () => {
     const servicesResponse = await fetch(`${baseUrl}/api/services`);
     const services = await servicesResponse.json();

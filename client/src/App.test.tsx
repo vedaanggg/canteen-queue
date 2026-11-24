@@ -22,7 +22,7 @@ const barbers = [
 ];
 const salonStatus = (onlineJoiningOpen = true) => ({ isOpen: true, status: 'open', openingTime: '10:00', closingTime: '21:00', onlineJoiningOpen, onlineJoiningEnabled: true, waitingCount: 0, estimatedWaitMinutes: 0, currentTime: '12:00:00', timezone: 'Asia/Kolkata', override: null });
 
-function mockApi({ joiningOpen = true, onEstimate, spotStatus = 'Waiting', previousDay = false }: { joiningOpen?: boolean; onEstimate?: (ids: number[], barber: string) => object; spotStatus?: string; previousDay?: boolean } = {}) {
+function mockApi({ joiningOpen = true, onEstimate, spotStatus = 'Waiting', previousDay = false, loginRejected = false }: { joiningOpen?: boolean; onEstimate?: (ids: number[], barber: string) => object; spotStatus?: string; previousDay?: boolean; loginRejected?: boolean } = {}) {
   const methods: string[] = [];
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     methods.push(init?.method ?? 'GET');
@@ -39,7 +39,11 @@ function mockApi({ joiningOpen = true, onEstimate, spotStatus = 'Waiting', previ
     const spot = { id: '5', token: 'S-5', tokenNumber: 5, tokenDay: '2026-11-24', name: 'Mira Patel', phone: '9876543210', barber: 'Ravi', status: spotStatus, services: [{ sourceServiceId: 1, nameEn: 'Haircut', nameGu: 'વાળ કપાવવું', durationMinutes: 30, price: 150 }], totalMinutes: 30, totalPrice: 150, createdAt: new Date().toISOString(), previousDay, readOnly: previousDay, position: spotStatus === 'Waiting' ? 1 : null, waitingCount: 1, expectedWaitMinutes: 0, isBarberOnBreak: false };
     if (url.pathname === '/api/queue' && init?.method === 'POST') body = { spot, existing: false };
     if (url.pathname === '/api/queue/5' && (!init?.method || init.method === 'GET')) body = { spot };
-    return { ok: true, status: 200, json: async () => body } as Response;
+    if (url.pathname === '/api/staff/login') body = { token: 'staff-token' };
+    if (url.pathname === '/api/reception') body = { date: '2026-11-24', barbers: [{ id: 1, name: 'Ravi', avatar: '👨🏽‍🦱', status: 'free', currentCustomer: null }], waitingList: [{ ...spot, id: '7', token: 'S-7', name: 'Rina Shah', status: 'Waiting', preferredBarber: 'any', waitingMinutes: 4, minutesWaited: 4, statusMinutes: 4, canMarkNoShow: false, services: [{ ...spot.services[0], quantity: 1 }] }], called: [], inChair: [] };
+    const failedLogin = loginRejected && url.pathname === '/api/staff/login';
+    if (failedLogin) body = { error: 'That staff PIN is incorrect.', code: 'INVALID_STAFF_PIN' };
+    return { ok: !failedLogin, status: failedLogin ? 401 : 200, json: async () => body } as Response;
   });
   vi.stubGlobal('fetch', fetchMock);
   return { fetchMock, methods };
@@ -134,11 +138,29 @@ describe('salon screens', () => {
 
   it('keeps the unrequested reception, barber, display and admin screens as placeholders', async () => {
     mockApi();
-    const cases: [string, string][] = [['/reception', 'Reception'], ['/barber/Mira', 'Barber workspace'], ['/display', 'Salon display'], ['/admin', 'Salon admin']];
+    const cases: [string, string][] = [['/barber/Mira', 'Barber workspace'], ['/display', 'Salon display'], ['/admin', 'Salon admin']];
     for (const [path, title] of cases) {
       cleanup(); renderAt(path);
       expect(await screen.findByRole('heading', { name: title })).toBeTruthy();
       expect(screen.getByText('This is a placeholder page. Salon features will be added in a later step.')).toBeTruthy();
     }
+  });
+
+  it('requires a staff PIN before showing Reception and reports a wrong PIN clearly', async () => {
+    const user = userEvent.setup(); mockApi({ loginRejected: true }); renderAt('/reception');
+    expect(await screen.findByRole('heading', { name: 'Staff login' })).toBeTruthy();
+    await user.type(screen.getByLabelText('Staff PIN'), 'wrong');
+    await user.click(screen.getByRole('button', { name: 'Staff login' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('That PIN is incorrect. Try again.');
+    expect(screen.queryByText('Rina Shah')).toBeNull();
+  });
+
+  it('logs in with the staff token and shows the Reception waiting list', async () => {
+    const user = userEvent.setup(); mockApi(); renderAt('/reception');
+    await user.type(await screen.findByLabelText('Staff PIN'), '4829');
+    await user.click(screen.getByRole('button', { name: 'Staff login' }));
+    expect(await screen.findByRole('heading', { name: 'Reception dashboard' })).toBeTruthy();
+    expect(screen.getByText('Rina Shah')).toBeTruthy();
+    expect(sessionStorage.getItem('salon-staff-token')).toBe('staff-token');
   });
 });

@@ -11,7 +11,7 @@ beforeEach(() => {
   database = new SQL.Database();
   database.run(`CREATE TABLE services (id INTEGER PRIMARY KEY, name_en TEXT, name_gu TEXT, duration_minutes INTEGER, price INTEGER, is_on INTEGER);
     CREATE TABLE barbers (id INTEGER PRIMARY KEY, name TEXT, status TEXT, is_on_duty INTEGER);
-    CREATE TABLE queue_entries (id INTEGER PRIMARY KEY, token_day TEXT, token_number INTEGER, token TEXT, request_id TEXT, name TEXT, phone TEXT, barber TEXT, status TEXT, total_minutes INTEGER, total_price INTEGER, created_at TEXT, status_updated_at TEXT);
+    CREATE TABLE queue_entries (id INTEGER PRIMARY KEY, token_day TEXT, token_number INTEGER, token TEXT, request_id TEXT, name TEXT, phone TEXT, barber TEXT, assigned_barber TEXT, status TEXT, total_minutes INTEGER, total_price INTEGER, created_at TEXT, status_updated_at TEXT);
     CREATE TABLE queue_entry_services (id INTEGER PRIMARY KEY, queue_entry_id INTEGER, source_service_id INTEGER, name_en TEXT, name_gu TEXT, duration_minutes INTEGER, price INTEGER);
     INSERT INTO services VALUES (1, 'Haircut', 'વાળ કપાવવું', 30, 150, 1), (2, 'Beard trim', 'દાઢી ટ્રીમ', 15, 80, 1), (3, 'Hidden service', 'બંધ સેવા', 20, 100, 0);
     INSERT INTO barbers VALUES (1, 'Ravi', 'free', 1), (2, 'Imran', 'on_break', 1);`);

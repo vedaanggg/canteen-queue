@@ -10,7 +10,7 @@ function query(database, sql, params = []) {
 export function createQueueService({ database, rules, clock = () => new Date(), persist = persistLiveDatabase, emit = () => {} } = {}) {
   const getDatabase = () => database ?? liveDatabase;
 
-  function createSpot(input = {}, emitEvent = emit) {
+  function createSpot(input = {}, emitEvent = emit, { walkIn = false } = {}) {
     const db = getDatabase();
     const name = typeof input.name === 'string' ? input.name.trim() : '';
     const phone = typeof input.phone === 'string' ? input.phone.trim() : '';
@@ -29,12 +29,13 @@ export function createQueueService({ database, rules, clock = () => new Date(), 
       const samePhone = query(db, "SELECT * FROM queue_entries WHERE phone = ? AND token_day = ? AND status IN ('Waiting', 'Called', 'In chair') ORDER BY id DESC LIMIT 1", [phone, day])[0];
       if (samePhone) { db.run('COMMIT'); return { spot: rules.getSpot(samePhone), existing: true, message: 'You are already in the queue.' }; }
       const status = rules.getStatus();
-      if (!status.onlineJoiningOpen) throw new CatalogError('Online joining is closed right now.', 409, 'QUEUE_CLOSED');
+      if (walkIn ? !status.isOpen : !status.onlineJoiningOpen) throw new CatalogError(walkIn ? 'Walk-ins can only be added during salon hours.' : 'Online joining is closed right now.', 409, walkIn ? 'SALON_CLOSED' : 'QUEUE_CLOSED');
       if (!Array.isArray(serviceIds) || serviceIds.length < 1 || serviceIds.length > 3) throw new CatalogError('Choose between 1 and 3 services.', 400, 'INVALID_SERVICE_COUNT');
       const ids = serviceIds.map(Number);
       if (ids.some((id) => !Number.isInteger(id) || id < 1) || new Set(ids).size !== ids.length) throw new CatalogError('Choose distinct valid services.', 400, 'INVALID_SERVICE_IDS');
-      const services = query(db, `SELECT id, name_en AS nameEn, name_gu AS nameGu, duration_minutes AS durationMinutes, price FROM services WHERE is_on = 1 AND id IN (${ids.map(() => '?').join(',')})`, ids);
-      if (services.length !== ids.length) throw new CatalogError('One or more selected services are unavailable.', 409, 'SERVICE_UNAVAILABLE');
+      const foundServices = query(db, `SELECT id, name_en AS nameEn, name_gu AS nameGu, duration_minutes AS durationMinutes, price FROM services WHERE is_on = 1 AND id IN (${ids.map(() => '?').join(',')})`, ids);
+      if (foundServices.length !== ids.length) throw new CatalogError('One or more selected services are unavailable.', 409, 'SERVICE_UNAVAILABLE');
+      const services = ids.map((id) => foundServices.find((service) => Number(service.id) === id));
       if (barber.toLowerCase() !== 'any') {
         const selected = query(db, 'SELECT name FROM barbers WHERE is_on_duty = 1 AND lower(name) = lower(?)', [barber])[0];
         if (!selected) throw new CatalogError('Choose a barber who is on duty, or Any barber.', 409, 'BARBER_UNAVAILABLE');
@@ -46,7 +47,7 @@ export function createQueueService({ database, rules, clock = () => new Date(), 
       const tokenNumber = Number(counter?.last_number ?? 0) + 1;
       if (counter) db.run('UPDATE queue_token_counters SET last_number = ? WHERE token_day = ?', [tokenNumber, day]);
       else db.run('INSERT INTO queue_token_counters (token_day, last_number) VALUES (?, ?)', [day, tokenNumber]);
-      db.run('INSERT INTO queue_entries (token_day, token_number, token, request_id, name, phone, barber, status, total_minutes, total_price, created_at, status_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [day, tokenNumber, `S-${tokenNumber}`, requestId, name, phone, barber, 'Waiting', totalMinutes, totalPrice, timestamp, timestamp]);
+      db.run('INSERT INTO queue_entries (token_day, token_number, token, request_id, name, phone, barber, assigned_barber, status, total_minutes, total_price, created_at, status_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)', [day, tokenNumber, `S-${tokenNumber}`, requestId, name, phone, barber, 'Waiting', totalMinutes, totalPrice, timestamp, timestamp]);
       const id = Number(query(db, 'SELECT last_insert_rowid() AS id')[0].id);
       for (const item of services) db.run('INSERT INTO queue_entry_services (queue_entry_id, source_service_id, name_en, name_gu, duration_minutes, price) VALUES (?, ?, ?, ?, ?, ?)', [id, item.id, item.nameEn, item.nameGu, item.durationMinutes, item.price]);
       db.run('COMMIT');

@@ -20,6 +20,12 @@ const english = {
   yourDetails: 'Your queue details', chosenServices: 'Services', preferredBarber: 'Barber', anyBarberStatus: 'Any barber', barberOnBreak: 'is on break', previousDay: 'This spot is from a previous day. It is read-only.',
   waiting: 'Waiting', called: 'It’s your turn!', goToBarber: 'Go to', inChair: 'Your service is in progress with', done: 'Thank you! Your visit is complete.', noShow: 'This spot was released because you did not arrive in time.', cancelled: 'Your spot has been cancelled.',
   cancelSpot: 'Cancel my spot', cancelConfirm: 'Cancel your queue spot?', cancel: 'Cancel', keepSpot: 'Keep my spot', joinAgain: 'Join again', notAvailable: 'No active wait estimate is available.',
+  staffPin: 'Staff PIN', staffPinPlaceholder: 'Enter staff PIN', staffLogin: 'Staff login', staffLogout: 'Log out', invalidPin: 'That PIN is incorrect. Try again.', staffAccessError: 'Unable to verify staff access.',
+  receptionDashboard: 'Reception dashboard', today: 'Today', refresh: 'Refresh', addWalkIn: 'Add walk-in', saveWalkIn: 'Add to queue', walkInAdded: 'Walk-in added to the queue.',
+  waitingList: 'Waiting list', calledCustomers: 'Called customers', currentCustomer: 'Current customer', noCurrentCustomer: 'No customer assigned', noWaiting: 'No one waiting — walk right in!',
+  callNext: 'Call next', barberAvailable: 'Available', barberBusy: 'Busy', noShowAction: 'No-show', cancelCustomer: 'Cancel', waitingTime: 'Waiting', minutesWaited: 'min waited', calledFor: 'Called for', noShowConfirm: 'Mark this customer as a No-show?', cancelCustomerConfirm: 'Cancel this Waiting customer?',
+  loadingReception: 'Loading reception dashboard…', receptionLoadError: 'Could not load the reception dashboard.', actionError: 'The action could not be completed.', noDutyBarbers: 'No barbers are on duty.', walkInPhone: 'Phone number', walkInName: 'Customer name', walkInBarber: 'Preferred barber',
+  calledStatus: 'Called', inChairStatus: 'In chair',
 } as const;
 
 export type TranslationKey = keyof typeof english;
@@ -46,6 +52,12 @@ export const translations: Record<Language, Dictionary> = {
     yourDetails: 'કતારની વિગતો', chosenServices: 'સેવાઓ', preferredBarber: 'વાળંદ', anyBarberStatus: 'કોઈપણ વાળંદ', barberOnBreak: 'વિરામ પર છે', previousDay: 'આ જગ્યા અગાઉના દિવસની છે. તે ફક્ત વાંચી શકાય છે.',
     waiting: 'રાહમાં', called: 'તમારો વારો છે!', goToBarber: 'આ વાળંદ પાસે જાઓ:', inChair: 'તમારી સેવા ચાલુ છે:', done: 'આભાર! તમારી મુલાકાત પૂર્ણ થઈ.', noShow: 'સમયસર ન આવવાથી તમારી જગ્યા મુક્ત કરવામાં આવી.', cancelled: 'તમારી જગ્યા રદ થઈ છે.',
     cancelSpot: 'મારી જગ્યા રદ કરો', cancelConfirm: 'તમારી કતારની જગ્યા રદ કરવી છે?', cancel: 'રદ કરો', keepSpot: 'જગ્યા રાખો', joinAgain: 'ફરી જોડાઓ', notAvailable: 'હાલ રાહનો અંદાજ ઉપલબ્ધ નથી.',
+    staffPin: 'સ્ટાફ પિન', staffPinPlaceholder: 'સ્ટાફ પિન લખો', staffLogin: 'સ્ટાફ લોગિન', staffLogout: 'લોગઆઉટ', invalidPin: 'આ પિન ખોટો છે. ફરી પ્રયાસ કરો.', staffAccessError: 'સ્ટાફ ઍક્સેસ તપાસી શકાયી નથી.',
+    receptionDashboard: 'રિસેપ્શન ડેશબોર્ડ', today: 'આજે', refresh: 'રીફ્રેશ', addWalkIn: 'વોક-ઇન ઉમેરો', saveWalkIn: 'કતારમાં ઉમેરો', walkInAdded: 'વોક-ઇન કતારમાં ઉમેરાયો.',
+    waitingList: 'રાહ જોતા લોકો', calledCustomers: 'બોલાવેલા ગ્રાહકો', currentCustomer: 'હાલના ગ્રાહક', noCurrentCustomer: 'કોઈ ગ્રાહક સોંપાયેલ નથી', noWaiting: 'કોઈ રાહ જોતું નથી — સીધા આવી જાઓ!',
+    callNext: 'આગળના ગ્રાહકને બોલાવો', barberAvailable: 'ઉપલબ્ધ', barberBusy: 'વ્યસ્ત', noShowAction: 'ગેરહાજર', cancelCustomer: 'રદ કરો', waitingTime: 'રાહ', minutesWaited: 'મિનિટથી રાહ', calledFor: 'બોલાવ્યા પછી', noShowConfirm: 'આ ગ્રાહકને ગેરહાજર તરીકે નોંધવો છે?', cancelCustomerConfirm: 'આ રાહ જોતા ગ્રાહકને રદ કરવો છે?',
+    loadingReception: 'રિસેપ્શન ડેશબોર્ડ લોડ થઈ રહ્યો છે…', receptionLoadError: 'રિસેપ્શન ડેશબોર્ડ લોડ થઈ શક્યું નથી.', actionError: 'આ ક્રિયા પૂર્ણ થઈ શકી નથી.', noDutyBarbers: 'આજે કોઈ વાળંદ ફરજ પર નથી.', walkInPhone: 'ફોન નંબર', walkInName: 'ગ્રાહકનું નામ', walkInBarber: 'પસંદગીના વાળંદ',
+    calledStatus: 'બોલાવ્યા', inChairStatus: 'ખુરશીમાં',
   },
 };
 

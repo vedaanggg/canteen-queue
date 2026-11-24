@@ -14,12 +14,12 @@ beforeAll(async () => { SQL = await initSqlJs(); });
 beforeEach(() => {
   database = new SQL.Database();
   database.run(`CREATE TABLE services (id INTEGER PRIMARY KEY, name_en TEXT, name_gu TEXT, duration_minutes INTEGER, price INTEGER, is_on INTEGER);
-    CREATE TABLE barbers (id INTEGER PRIMARY KEY, name TEXT, status TEXT, is_on_duty INTEGER);
-    CREATE TABLE queue_entries (id INTEGER PRIMARY KEY AUTOINCREMENT, token_day TEXT, token_number INTEGER, token TEXT, request_id TEXT UNIQUE, name TEXT, phone TEXT, barber TEXT, status TEXT, total_minutes INTEGER, total_price INTEGER, created_at TEXT, status_updated_at TEXT, UNIQUE(token_day, token_number));
+    CREATE TABLE barbers (id INTEGER PRIMARY KEY, name TEXT, avatar TEXT, status TEXT, is_on_duty INTEGER);
+    CREATE TABLE queue_entries (id INTEGER PRIMARY KEY AUTOINCREMENT, token_day TEXT, token_number INTEGER, token TEXT, request_id TEXT UNIQUE, name TEXT, phone TEXT, barber TEXT, assigned_barber TEXT, status TEXT, total_minutes INTEGER, total_price INTEGER, created_at TEXT, status_updated_at TEXT, UNIQUE(token_day, token_number));
     CREATE TABLE queue_entry_services (id INTEGER PRIMARY KEY AUTOINCREMENT, queue_entry_id INTEGER, source_service_id INTEGER, name_en TEXT, name_gu TEXT, duration_minutes INTEGER, price INTEGER);
     CREATE TABLE queue_token_counters (token_day TEXT PRIMARY KEY, last_number INTEGER);
     INSERT INTO services VALUES (1, 'Haircut', 'વાળ કપાવવું', 30, 150, 1), (2, 'Beard trim', 'દાઢી ટ્રીમ', 15, 80, 1), (3, 'Hair spa', 'હેર સ્પા', 45, 400, 1), (4, 'Facial', 'ફેશિયલ', 40, 350, 1), (5, 'Off service', 'બંધ', 5, 10, 0);
-    INSERT INTO barbers VALUES (1, 'Ravi', 'free', 1), (2, 'Amit', 'free', 1), (3, 'Imran', 'on_break', 1);`);
+    INSERT INTO barbers VALUES (1, 'Ravi', '👨🏽‍🦱', 'free', 1), (2, 'Amit', '👨🏻‍🦱', 'free', 1), (3, 'Imran', '🧔🏽', 'on_break', 1);`);
   now = new Date('2026-11-24T05:00:00.000Z');
   rules = createQueueRulesService({ database, clock: () => now, timezone: 'Asia/Kolkata', joiningEnabled: () => true, override: 'open' });
   queue = createQueueService({ database, rules, clock: () => now, persist: () => {} });
@@ -80,6 +80,16 @@ describe('real customer queue', () => {
     expect(() => create()).toThrow(/closed/i);
   });
 
+  it('allows walk-ins during the 30-minute online cutoff until the salon closes', () => {
+    now = new Date('2026-11-24T15:15:00.000Z'); // 8:45 PM IST
+    rules = createQueueRulesService({ database, clock: () => now, timezone: 'Asia/Kolkata', joiningEnabled: () => true });
+    queue = createQueueService({ database, rules, clock: () => now, persist: () => {} });
+    expect(rules.getStatus().onlineJoiningOpen).toBe(false);
+    expect(() => create()).toThrow(/closed/i);
+    const body = { name: 'Walk in', phone: '9123456780', serviceIds: [1], barber: 'any', requestId: uuid() };
+    expect(queue.createSpot(body, undefined, { walkIn: true }).spot.token).toBe('S-1');
+  });
+
   it('calculates total minutes and rupees on the backend and snapshots the service data', () => {
     const result = create({ serviceIds: [1, 2] }).spot;
     expect(result).toMatchObject({ totalMinutes: 45, totalPrice: 230, services: [{ nameEn: 'Haircut', durationMinutes: 30, price: 150 }, { nameEn: 'Beard trim', durationMinutes: 15, price: 80 }] });
@@ -104,6 +114,49 @@ describe('real customer queue', () => {
     expect(target.expectedWaitMinutes).toBe(75);
     expect(rules.estimate([1], 'any').expectedWaitMinutes).toBe(55);
     expect(rules.estimate([1], 'Ravi').expectedWaitMinutes).toBe(90);
+  });
+
+  it('calls the earliest compatible spot, reserves the barber, and rejects another call for that barber', () => {
+    const specific = create({ barber: 'Ravi' }).spot;
+    const any = create({ barber: 'any' }).spot;
+    expect(rules.callNext(2)).toMatchObject({ id: any.id, status: 'Called', assignedBarber: 'Amit' });
+    expect(rules.callNext(1)).toMatchObject({ id: specific.id, status: 'Called', assignedBarber: 'Ravi' });
+    expect(() => rules.callNext(2)).toThrow(/not available|active customer/i);
+  });
+
+  it('handles simultaneous Call next actions without double-calling a customer or overbooking a barber', async () => {
+    create({ barber: 'any' });
+    create({ barber: 'any' });
+    const results = await Promise.allSettled([
+      Promise.resolve().then(() => rules.callNext(1)),
+      Promise.resolve().then(() => rules.callNext(1)),
+    ]);
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect(database.exec('SELECT status FROM queue_entries WHERE id = 1')[0].values[0][0]).toBe('Called');
+    expect(database.exec("SELECT COUNT(*) FROM queue_entries WHERE status IN ('Called', 'In chair') AND assigned_barber = 'Ravi'")[0].values[0][0]).toBe(1);
+  });
+
+  it('keeps Called barber reservation until a permitted status outcome and enforces the 10-minute no-show threshold', () => {
+    const spot = create({ barber: 'Ravi' }).spot;
+    rules.callNext(1);
+    expect(() => rules.cancelWaiting(spot.id)).toThrow(/only Waiting/i);
+    expect(() => rules.markNoShow(spot.id)).toThrow(/after 10 minutes/i);
+    now = new Date(now.getTime() + 10 * 60_000);
+    expect(rules.markNoShow(spot.id)).toMatchObject({ status: 'No-show', assignedBarber: 'Ravi' });
+    expect(database.exec("SELECT status FROM barbers WHERE id = 1")[0].values[0][0]).toBe('free');
+  });
+
+  it('returns the reception view for today only with current barber and waiting times', () => {
+    const waiting = create({ barber: 'Ravi' }).spot;
+    now = new Date(now.getTime() + 22 * 60_000);
+    const view = rules.getReceptionData();
+    expect(view.waitingList).toHaveLength(1);
+    expect(view.waitingList[0]).toMatchObject({ id: waiting.id, waitingMinutes: 22, preferredBarber: 'Ravi', services: [{ quantity: 1 }] });
+    now = new Date('2026-11-24T18:31:00.000Z');
+    create({ phone: '9000001111' });
+    expect(rules.getReceptionData().date).toBe('2026-11-25');
+    expect(rules.getReceptionData().waitingList).toHaveLength(1);
   });
 
   it('returns old-day spots as read-only without changing their saved status', () => {

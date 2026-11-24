@@ -64,6 +64,8 @@ export async function initializeDatabase() {
     );
     INSERT OR IGNORE INTO salon_settings (id, online_joining_enabled) VALUES (1, 1);
   `);
+  const queueColumns = queryRows('PRAGMA table_info(queue_entries)').map((column) => column.name);
+  if (!queueColumns.includes('assigned_barber')) db.run('ALTER TABLE queue_entries ADD COLUMN assigned_barber TEXT');
   seedServicesIfEmpty();
   seedBarbersIfEmpty();
   persistDatabase();

@@ -7,6 +7,7 @@ import { fetchHealth } from './lib/api';
 import HomePage from './screens/HomePage';
 import JoinQueuePage from './screens/JoinQueuePage';
 import MyStatusPage from './screens/MyStatusPage';
+import ReceptionPage from './screens/ReceptionPage';
 
 const pages = [
   { path: '/', key: 'home' }, { path: '/join', key: 'join' }, { path: '/status/demo', key: 'status' },
@@ -64,7 +65,7 @@ function AppShell() {
       <Route path="/" element={<HomePage />} />
       <Route path="/join" element={<JoinQueuePage />} />
       <Route path="/status/:id" element={<MyStatusPage />} />
-      <Route path="/reception" element={<Placeholder titleKey="receptionTitle" route="/reception" />} />
+      <Route path="/reception" element={<ReceptionPage />} />
       <Route path="/barber/:name" element={<Placeholder titleKey="barberTitle" route="/barber/:name" />} />
       <Route path="/display" element={<Placeholder titleKey="displayTitle" route="/display" />} />
       <Route path="/admin" element={<Placeholder titleKey="adminTitle" route="/admin" />} />
