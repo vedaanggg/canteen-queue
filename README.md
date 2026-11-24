@@ -3,7 +3,7 @@
 Salon Studio is currently a development scaffold with placeholder routes for
 the salon app. No booking, reception, barber, display, or admin features are
 implemented yet.
-
+**Staff PIN (reception, barber, admin):** 1234
 ## Local development
 
 1. Copy `.env.example` to `.env` and set backend configuration.
