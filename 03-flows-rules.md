@@ -131,3 +131,9 @@
 - At the start of each new IST day, any active order from a previous day
   (Placed, Preparing or Ready) is hidden from the Kitchen Board and TV.
   It stays in the database.
+
+- If a student opens an order from a previous day, /order/:id shows the order
+  read-only with the banner "This order is from a previous day." It keeps its
+  last saved status. The database status is not changed. There is no Cancel
+  button, no estimated wait and no live updates for it.
+- Previous-day orders are not counted in today's summary cards.
