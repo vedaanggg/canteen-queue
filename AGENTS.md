@@ -47,4 +47,8 @@ kitchen staff move orders on a board, and a TV shows "Now Serving".
 - Live link must be the first line after the title in README.md.
 - After each task: list the changed files and the exact commands to test.
 
+<<<<<<< HEAD
 Use Asia/Kolkata for all time rules (CANTEEN_TIMEZONE env var)
+=======
+Use Asia/Kolkata for all time rules (CANTEEN_TIMEZONE env var)
+>>>>>>> 3dd07e2820e510c8d69b2ecbbd30dde1b0cd01cf

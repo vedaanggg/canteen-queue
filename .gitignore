@@ -1,4 +1,7 @@
 node_modules/
+dist/
+*.db
+*.sqlite
 client/node_modules/
 server/node_modules/
 .npm-cache/
