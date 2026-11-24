@@ -165,3 +165,50 @@ assigned barber can start, wrong transitions rejected, break blocked while busy,
 next-for-you picks the right customer, waiting time goes down after Done, and
 the display endpoint output. Update docs/api.md. List changed files and test
 commands, and tell me exactly what you tested and what you did not.
+
+Read AGENTS.md and docs/. Build only Screen 7 (Owner Settings, /admin) from
+docs/02-screens.md and docs/03-flows-rules.md. Do not change other screens,
+except small changes so they react to settings changes.
+
+Access: needs the staff PIN, reusing the existing staff login and token. All
+admin endpoints reject requests without a valid token, on the BACKEND.
+
+Services:
+- Table of services: name in English, name in Gujarati, minutes, price, on/off
+  toggle, Edit. [ + Add service ] opens a side panel form. No delete, only
+  on/off, so past spots keep their snapshots.
+- Backend validation: English and Gujarati names required (max 50 characters
+  each), minutes a whole number from 5 to 180, price a whole rupee amount from 1
+  to 9999. Return clear errors, shown in the form. Duplicate English names are
+  rejected.
+- Turning a service off hides it from Join (and from the walk-in form) but does
+  not change spots that already include it.
+
+Barbers and queue:
+- Barbers on duty today: a toggle for each barber. A barber cannot be switched
+  off duty while a customer is Called or In chair; show a clear error. When a
+  barber is switched off duty, customers waiting for that barber see "Ravi is
+  not available today", and Reception gets a [ Move to Any ] action on those
+  customers (backend endpoint, staff token required).
+- Queue switch: Open / Closed for online joining. Closed disables Join with the
+  clear message on Home and Join, and walk-ins still work. Persist in SQLite.
+  Use the existing joining-open rule module.
+
+Stats cards (today only, IST): customers served (Done), average wait (minutes
+from joining to starting, for customers who started), and no-shows. Cancelled
+spots are not counted as served.
+
+Realtime: emit Socket.IO events on every settings change so Home, Join,
+Reception, Barber View and the TV refresh without a reload, within 5 seconds.
+
+Frontend: tablet-friendly layout, also usable on a phone. Loading, error and
+empty states, a "Reconnecting..." note and a 5-second polling fallback. Every
+label from the EN/GU file. Charcoal and gold theme, tap targets at least 44px.
+Disable buttons while requests run.
+
+Write Vitest tests for: service validation (each rule), duplicate names, off
+services excluded from the join list, off-duty barber blocked while busy, Move
+to Any, queue switch blocking online joining but not walk-ins, stats calculation
+(served, average wait, no-shows, cancelled excluded), and admin endpoints
+rejecting a missing token. Update docs/api.md. List changed files and test
+commands, and tell me exactly what you tested and what you did not.
