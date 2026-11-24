@@ -1,4 +1,4 @@
-import { Link, Route, Routes, useParams } from 'react-router-dom';
+import { Link, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { socket } from './lib/socket';
 import { LanguageProvider, useLanguage } from './i18n/LanguageContext';
@@ -8,6 +8,8 @@ import HomePage from './screens/HomePage';
 import JoinQueuePage from './screens/JoinQueuePage';
 import MyStatusPage from './screens/MyStatusPage';
 import ReceptionPage from './screens/ReceptionPage';
+import BarberPage from './screens/BarberPage';
+import DisplayPage from './screens/DisplayPage';
 
 const pages = [
   { path: '/', key: 'home' }, { path: '/join', key: 'join' }, { path: '/status/demo', key: 'status' },
@@ -46,7 +48,10 @@ function Placeholder({ titleKey, route }: { titleKey: TranslationKey; route: str
 
 function AppShell() {
   const { language, setLanguage, t } = useLanguage();
+  const location = useLocation();
+  const isDisplay = location.pathname === '/display';
   return <div className="min-h-screen bg-charcoal text-white">
+    {!isDisplay && <>
     <header className="border-b border-white/10 bg-slate-900/70">
       <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
         <Link className="text-xl font-extrabold tracking-wide text-white" to="/">{t('brand')}</Link>
@@ -61,17 +66,18 @@ function AppShell() {
         </div>
       </div>
     </header>
+    </>}
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/join" element={<JoinQueuePage />} />
       <Route path="/status/:id" element={<MyStatusPage />} />
       <Route path="/reception" element={<ReceptionPage />} />
-      <Route path="/barber/:name" element={<Placeholder titleKey="barberTitle" route="/barber/:name" />} />
-      <Route path="/display" element={<Placeholder titleKey="displayTitle" route="/display" />} />
+      <Route path="/barber/:name" element={<BarberPage />} />
+      <Route path="/display" element={<DisplayPage />} />
       <Route path="/admin" element={<Placeholder titleKey="adminTitle" route="/admin" />} />
       <Route path="*" element={<Placeholder titleKey="notFound" route="*" />} />
     </Routes>
-    <footer className="mx-auto flex max-w-7xl justify-center px-4 pb-6"><HealthStatus /></footer>
+    {!isDisplay && <footer className="mx-auto flex max-w-7xl justify-center px-4 pb-6"><HealthStatus /></footer>}
   </div>;
 }
 

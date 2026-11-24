@@ -47,6 +47,8 @@ export async function initializeDatabase() {
       total_price INTEGER NOT NULL,
       created_at TEXT NOT NULL,
       status_updated_at TEXT NOT NULL,
+      started_at TEXT,
+      finished_at TEXT,
       UNIQUE(token_day, token_number)
     );
     CREATE TABLE IF NOT EXISTS queue_entry_services (
@@ -66,6 +68,8 @@ export async function initializeDatabase() {
   `);
   const queueColumns = queryRows('PRAGMA table_info(queue_entries)').map((column) => column.name);
   if (!queueColumns.includes('assigned_barber')) db.run('ALTER TABLE queue_entries ADD COLUMN assigned_barber TEXT');
+  if (!queueColumns.includes('started_at')) db.run('ALTER TABLE queue_entries ADD COLUMN started_at TEXT');
+  if (!queueColumns.includes('finished_at')) db.run('ALTER TABLE queue_entries ADD COLUMN finished_at TEXT');
   seedServicesIfEmpty();
   seedBarbersIfEmpty();
   persistDatabase();

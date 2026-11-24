@@ -1,8 +1,8 @@
 # Salon API plan
 
 This API evolves incrementally. The health check, salon catalog, opening and
-joining status, queue estimate, customer joining, status, cancellation and the
-Reception workflow are implemented. Barber, Display, and Admin workflows
+joining status, queue estimate, customer joining, status, cancellation,
+Reception, Barber View and Waiting Area Display are implemented. Owner Settings
 remain planned.
 
 ## Environment
@@ -35,13 +35,16 @@ remain planned.
 | POST | `/api/reception/call-next` | Call the earliest eligible Waiting spot for a barber. | Implemented |
 | POST | `/api/reception/:id/cancel` | Cancel a Waiting spot as staff. | Implemented |
 | POST | `/api/reception/:id/no-show` | Mark a Called customer No-show after 10 minutes. | Implemented |
-| GET | `/api/barbers/:name/queue` | Barber queue view. | Planned |
-| GET | `/api/display` | Public salon waiting display data. | Planned |
+| GET | `/api/barbers/:name/view` | Return an on-duty barber's current customer and next eligible Waiting customer. | Implemented; staff token required |
+| POST | `/api/queue/:id/start` | Assigned barber moves Called to In chair and records start time. | Implemented; staff token required |
+| POST | `/api/queue/:id/done` | Assigned barber moves In chair to Done and records finish time. | Implemented; staff token required |
+| POST | `/api/barbers/:id/break` | Set an on-duty barber to `on_break` or `free`; active Called/In chair customers block break. | Implemented; staff token required |
+| GET | `/api/display` | Public today-only barber state and next five Waiting tokens with wait estimates. | Implemented |
 | GET/POST/PATCH/DELETE | `/api/admin/*` | Salon services, barber, and setting management. | Planned |
 
 The Join screen creates spots through `POST /api/queue`. Reception can call a
-Waiting spot and mark it No-show after 10 minutes. The barber-driven In chair
-and Done actions remain planned. Unknown `/api` routes return HTTP 404.
+Waiting spot and mark it No-show after 10 minutes. Barber View handles In chair
+and Done transitions. Unknown `/api` routes return HTTP 404.
 
 All staff routes other than `POST /api/staff/login` require
 `Authorization: Bearer <token>`. Login issues a random in-memory token after a
@@ -57,7 +60,8 @@ backend restart. If `STAFF_PIN` is unset, login returns HTTP 503.
 - `salon_settings`: singleton owner switch for online joining, enabled by
   default.
 - `queue_entries`: daily token, unique client request UUID, customer details,
-  preferred barber, assigned barber, status, totals and timestamps. An active
+  preferred barber, assigned barber, status, totals and created/status/started/
+  finished timestamps. An active
   spot is checked for the same phone on the current salon day.
 - `queue_entry_services`: immutable English/Gujarati name, duration and price
   snapshot for each service selected when joining.
@@ -69,11 +73,11 @@ backend restart. If `STAFF_PIN` is unset, login returns HTTP 503.
 | Direction | Event | Payload | Status |
 | --- | --- | --- | --- |
 | Server → client | `connection:ready` | `{ "connected": true }` | Implemented |
-| Server → clients | `queue:updated` | `{ action: "joined" | "cancelled" | "status", id, token, status }` | Implemented for join, call-next, cancel and no-show |
+| Server → clients | `queue:updated` | Status changes: `{ action, id, token, status }`; barber changes: `{ action: "barber", barberId, barberName, status }` | Implemented for join, cancel, call-next, no-show, start, done and break |
 | Server → clients | `salon:updated` | To be defined with salon settings requirements. | Planned |
 
 Socket.IO CORS uses `CLIENT_ORIGIN`; the browser connects through
-`VITE_API_URL`. No salon update events are emitted yet.
+`VITE_API_URL`. No salon settings events are emitted yet.
 
 ## Implemented response rules
 
@@ -124,9 +128,10 @@ is initially empty, so estimates start at zero.
 On creation and cancellation the server emits `queue:updated` with
 `{ action: "joined" | "cancelled", id, token, status }`. The client listens
 for queue updates and uses 5-second polling while disconnected. Call-next and
-No-show also emit `{ action: "status", id, token, status }`, allowing the
-customer page and reception dashboard to refresh. No status-change event exists
-yet for future Barber View actions.
+No-show, Start and Done also emit `{ action: "status", id, token, status }`,
+allowing Home, Barber View, Reception, TV and customer status pages to refresh.
+Break changes emit `{ action: "barber", barberId, barberName, status }`. Screens
+poll every five seconds while disconnected and refetch after reconnecting.
 
 `GET /api/reception` returns `{ date, barbers, waitingList, called, inChair }`.
 The lists are restricted to the current `SALON_TIMEZONE` date. Queue entries
@@ -150,3 +155,27 @@ Reception cancellation only accepts Waiting spots. `POST
 cannot be cancelled under the status transition rule; they remain reserved
 until In chair or No-show. This follows `docs/03-flows-rules.md`'s rule that
 staff cancel only Waiting customers.
+
+`GET /api/barbers/:name/view` requires a staff bearer token and returns
+`{ barber, nextCustomer }`. The current customer is a same-day Called or In
+chair spot assigned to that barber. The next customer is the earliest Waiting
+spot that chose that barber or `any`. Unknown or off-duty names return
+`BARBER_NOT_FOUND` with HTTP 404.
+
+`POST /api/queue/:id/start` and `/done` both require a staff bearer token and a
+`barberId`. Start accepts only a same-day Called spot assigned to that barber,
+changes it to In chair and records `started_at`. Done accepts only an In chair
+spot assigned to that barber, changes it to Done, records `finished_at`, and
+frees the barber when no other active spot is reserved. Both transitions are
+transactional and return HTTP 409 for invalid transitions or conflicts.
+
+`POST /api/barbers/:id/break` requires `{ onBreak: boolean }` and a staff token.
+It changes the barber to `on_break` or `free`; an assigned Called or In chair
+spot prevents the change. It emits a barber `queue:updated` event so connected
+screens refresh.
+
+`GET /api/display` is public and returns `{ date, barbers, upNext }`. It includes
+only today's on-duty barbers and up to five Waiting spots, with each barber's
+status (`called`, `in_chair`, `free`, or `on_break`) and `currentToken`, plus the
+next tokens' expected wait estimates. The TV flashes and attempts a short chime
+when it receives a Called event; sound failure is ignored.

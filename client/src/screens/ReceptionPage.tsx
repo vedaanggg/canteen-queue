@@ -84,7 +84,10 @@ export default function ReceptionPage() {
       sessionStorage.setItem(TOKEN_KEY, result.token); setToken(result.token); setPin('');
     } catch (cause) {
       const apiError = cause instanceof ApiError ? cause : null;
-      setLoginError(apiError?.code === 'INVALID_STAFF_PIN' ? t('invalidPin') : apiError?.message ?? t('staffAccessError'));
+      if (apiError?.code === 'INVALID_STAFF_PIN') setLoginError(t('invalidPin'));
+      else if (apiError?.code === 'STAFF_PIN_NOT_CONFIGURED') setLoginError(t('staffPinMissing'));
+      else if (apiError?.code === 'API_URL_NOT_CONFIGURED') setLoginError(t('apiUrlMissing'));
+      else setLoginError(apiError?.message ?? t('staffLoginNetworkError'));
     }
   }
 

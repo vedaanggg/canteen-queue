@@ -30,6 +30,11 @@ salonRouter.get('/status', (_request, response) => {
   catch (error) { sendError(error, response); }
 });
 
+salonRouter.get('/display', (_request, response) => {
+  try { response.json(queueRules.getDisplayData()); }
+  catch (error) { sendError(error, response); }
+});
+
 salonRouter.get('/queue/estimate', (request, response) => {
   try {
     const serviceIds = typeof request.query.serviceIds === 'string' ? request.query.serviceIds.split(',') : [];

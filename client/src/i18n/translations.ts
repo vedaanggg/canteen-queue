@@ -20,12 +20,17 @@ const english = {
   yourDetails: 'Your queue details', chosenServices: 'Services', preferredBarber: 'Barber', anyBarberStatus: 'Any barber', barberOnBreak: 'is on break', previousDay: 'This spot is from a previous day. It is read-only.',
   waiting: 'Waiting', called: 'It’s your turn!', goToBarber: 'Go to', inChair: 'Your service is in progress with', done: 'Thank you! Your visit is complete.', noShow: 'This spot was released because you did not arrive in time.', cancelled: 'Your spot has been cancelled.',
   cancelSpot: 'Cancel my spot', cancelConfirm: 'Cancel your queue spot?', cancel: 'Cancel', keepSpot: 'Keep my spot', joinAgain: 'Join again', notAvailable: 'No active wait estimate is available.',
-  staffPin: 'Staff PIN', staffPinPlaceholder: 'Enter staff PIN', staffLogin: 'Staff login', staffLogout: 'Log out', invalidPin: 'That PIN is incorrect. Try again.', staffAccessError: 'Unable to verify staff access.',
+  staffPin: 'Staff PIN', staffPinPlaceholder: 'Enter staff PIN', staffLogin: 'Staff login', staffLogout: 'Log out', invalidPin: 'That PIN is incorrect. Try again.', staffAccessError: 'Unable to verify staff access.', staffPinMissing: 'The server has no staff PIN configured. Set STAFF_PIN on the backend and restart it.', apiUrlMissing: 'The frontend API URL is missing. Set VITE_API_URL and restart the frontend.', staffLoginNetworkError: 'Could not reach the staff login service. Check the API URL and backend connection.',
   receptionDashboard: 'Reception dashboard', today: 'Today', refresh: 'Refresh', addWalkIn: 'Add walk-in', saveWalkIn: 'Add to queue', walkInAdded: 'Walk-in added to the queue.',
   waitingList: 'Waiting list', calledCustomers: 'Called customers', currentCustomer: 'Current customer', noCurrentCustomer: 'No customer assigned', noWaiting: 'No one waiting — walk right in!',
   callNext: 'Call next', barberAvailable: 'Available', barberBusy: 'Busy', noShowAction: 'No-show', cancelCustomer: 'Cancel', waitingTime: 'Waiting', minutesWaited: 'min waited', calledFor: 'Called for', noShowConfirm: 'Mark this customer as a No-show?', cancelCustomerConfirm: 'Cancel this Waiting customer?',
   loadingReception: 'Loading reception dashboard…', receptionLoadError: 'Could not load the reception dashboard.', actionError: 'The action could not be completed.', noDutyBarbers: 'No barbers are on duty.', walkInPhone: 'Phone number', walkInName: 'Customer name', walkInBarber: 'Preferred barber',
   calledStatus: 'Called', inChairStatus: 'In chair',
+  startService: 'Start', finishService: 'Done', nextForYou: 'Next for you', noOneWaitingForYou: 'No one waiting for you',
+  available: 'Available', goOnBreak: 'On break', unknownBarber: 'We could not find this barber on today’s roster.',
+  currentCustomerLabel: 'Current customer', serviceTimer: 'Time in chair', barberLoginHint: 'Enter the staff PIN to open your barber view.',
+  displayNow: 'Now', upNext: 'Up next', expectedAt: 'Expected in', displayFree: 'Free', displayEmpty: 'No customers are waiting right now.',
+  displayNoBarbers: 'No barbers are on duty right now.',
 } as const;
 
 export type TranslationKey = keyof typeof english;
@@ -52,12 +57,17 @@ export const translations: Record<Language, Dictionary> = {
     yourDetails: 'કતારની વિગતો', chosenServices: 'સેવાઓ', preferredBarber: 'વાળંદ', anyBarberStatus: 'કોઈપણ વાળંદ', barberOnBreak: 'વિરામ પર છે', previousDay: 'આ જગ્યા અગાઉના દિવસની છે. તે ફક્ત વાંચી શકાય છે.',
     waiting: 'રાહમાં', called: 'તમારો વારો છે!', goToBarber: 'આ વાળંદ પાસે જાઓ:', inChair: 'તમારી સેવા ચાલુ છે:', done: 'આભાર! તમારી મુલાકાત પૂર્ણ થઈ.', noShow: 'સમયસર ન આવવાથી તમારી જગ્યા મુક્ત કરવામાં આવી.', cancelled: 'તમારી જગ્યા રદ થઈ છે.',
     cancelSpot: 'મારી જગ્યા રદ કરો', cancelConfirm: 'તમારી કતારની જગ્યા રદ કરવી છે?', cancel: 'રદ કરો', keepSpot: 'જગ્યા રાખો', joinAgain: 'ફરી જોડાઓ', notAvailable: 'હાલ રાહનો અંદાજ ઉપલબ્ધ નથી.',
-    staffPin: 'સ્ટાફ પિન', staffPinPlaceholder: 'સ્ટાફ પિન લખો', staffLogin: 'સ્ટાફ લોગિન', staffLogout: 'લોગઆઉટ', invalidPin: 'આ પિન ખોટો છે. ફરી પ્રયાસ કરો.', staffAccessError: 'સ્ટાફ ઍક્સેસ તપાસી શકાયી નથી.',
+    staffPin: 'સ્ટાફ પિન', staffPinPlaceholder: 'સ્ટાફ પિન લખો', staffLogin: 'સ્ટાફ લોગિન', staffLogout: 'લોગઆઉટ', invalidPin: 'આ પિન ખોટો છે. ફરી પ્રયાસ કરો.', staffAccessError: 'સ્ટાફ ઍક્સેસ તપાસી શકાયી નથી.', staffPinMissing: 'સર્વર પર સ્ટાફ પિન સેટ નથી. બેકએન્ડમાં STAFF_PIN સેટ કરીને ફરી શરૂ કરો.', apiUrlMissing: 'ફ્રન્ટએન્ડ API URL મળ્યું નથી. VITE_API_URL સેટ કરીને ફ્રન્ટએન્ડ ફરી શરૂ કરો.', staffLoginNetworkError: 'સ્ટાફ લોગિન સર્વર સાથે જોડાઈ શક્યું નથી. API URL અને બેકએન્ડ તપાસો.',
     receptionDashboard: 'રિસેપ્શન ડેશબોર્ડ', today: 'આજે', refresh: 'રીફ્રેશ', addWalkIn: 'વોક-ઇન ઉમેરો', saveWalkIn: 'કતારમાં ઉમેરો', walkInAdded: 'વોક-ઇન કતારમાં ઉમેરાયો.',
     waitingList: 'રાહ જોતા લોકો', calledCustomers: 'બોલાવેલા ગ્રાહકો', currentCustomer: 'હાલના ગ્રાહક', noCurrentCustomer: 'કોઈ ગ્રાહક સોંપાયેલ નથી', noWaiting: 'કોઈ રાહ જોતું નથી — સીધા આવી જાઓ!',
     callNext: 'આગળના ગ્રાહકને બોલાવો', barberAvailable: 'ઉપલબ્ધ', barberBusy: 'વ્યસ્ત', noShowAction: 'ગેરહાજર', cancelCustomer: 'રદ કરો', waitingTime: 'રાહ', minutesWaited: 'મિનિટથી રાહ', calledFor: 'બોલાવ્યા પછી', noShowConfirm: 'આ ગ્રાહકને ગેરહાજર તરીકે નોંધવો છે?', cancelCustomerConfirm: 'આ રાહ જોતા ગ્રાહકને રદ કરવો છે?',
     loadingReception: 'રિસેપ્શન ડેશબોર્ડ લોડ થઈ રહ્યો છે…', receptionLoadError: 'રિસેપ્શન ડેશબોર્ડ લોડ થઈ શક્યું નથી.', actionError: 'આ ક્રિયા પૂર્ણ થઈ શકી નથી.', noDutyBarbers: 'આજે કોઈ વાળંદ ફરજ પર નથી.', walkInPhone: 'ફોન નંબર', walkInName: 'ગ્રાહકનું નામ', walkInBarber: 'પસંદગીના વાળંદ',
     calledStatus: 'બોલાવ્યા', inChairStatus: 'ખુરશીમાં',
+    startService: 'શરૂ કરો', finishService: 'પૂર્ણ', nextForYou: 'તમારા માટે આગળ', noOneWaitingForYou: 'તમારા માટે કોઈ રાહ જોતું નથી',
+    available: 'ઉપલબ્ધ', goOnBreak: 'વિરામ પર જાઓ', unknownBarber: 'આજે આ વાળંદ ફરજ પર નથી.',
+    currentCustomerLabel: 'હાલના ગ્રાહક', serviceTimer: 'ખુરશીમાં સમય', barberLoginHint: 'વાળંદ દૃશ્ય ખોલવા સ્ટાફ પિન લખો.',
+    displayNow: 'હાલ', upNext: 'આગળ', expectedAt: 'અંદાજે', displayFree: 'ખાલી', displayEmpty: 'હાલ કોઈ ગ્રાહક રાહ જોતો નથી.',
+    displayNoBarbers: 'અત્યારે કોઈ વાળંદ ફરજ પર નથી.',
   },
 };
 

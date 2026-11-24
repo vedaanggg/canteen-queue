@@ -12,7 +12,7 @@ export interface QueueEstimate { serviceIds: number[]; barber: string; totalMinu
 export type QueueSpotStatus = 'Waiting' | 'Called' | 'In chair' | 'Done' | 'No-show' | 'Cancelled';
 export interface QueueSpot {
   id: string; token: string; tokenNumber: number; tokenDay: string; name: string; phone: string; barber: string;
-  assignedBarber?: string | null; statusUpdatedAt?: string;
+  assignedBarber?: string | null; statusUpdatedAt?: string; startedAt?: string | null; finishedAt?: string | null;
   status: QueueSpotStatus; services: Array<{ sourceServiceId: number; nameEn: string; nameGu: string; durationMinutes: number; price: number }>;
   totalMinutes: number; totalPrice: number; createdAt: string; previousDay: boolean; readOnly: boolean;
   position: number | null; waitingCount: number; expectedWaitMinutes: number | null; isBarberOnBreak: boolean;
@@ -27,6 +27,8 @@ export interface ReceptionBarber {
   currentCustomer: null | { id: number; token: string; name: string; status: string; totalMinutes: number; elapsedMinutes: number; assignedAt?: string };
 }
 export interface ReceptionData { date: string; barbers: ReceptionBarber[]; waitingList: ReceptionEntry[]; called: ReceptionEntry[]; inChair: ReceptionEntry[] }
+export interface BarberView { barber: { id: number; name: string; avatar: string; status: 'free' | 'busy' | 'on_break'; currentCustomer: ReceptionEntry | null }; nextCustomer: ReceptionEntry | null }
+export interface DisplayData { date: string; barbers: Array<{ id: number; name: string; avatar: string; status: 'on_break' | 'in_chair' | 'called' | 'free'; currentToken: string | null }>; upNext: Array<{ id: string; token: string; name: string; barber: string; expectedWaitMinutes: number | null }> }
 export class ApiError extends Error {
   constructor(message: string, public status: number, public code?: string) { super(message); }
 }
@@ -36,7 +38,7 @@ export async function fetchHealth(signal?: AbortSignal): Promise<HealthResponse>
 }
 
 async function requestJson<T>(path: string, signal?: AbortSignal): Promise<T> {
-  if (!apiUrl) throw new Error('The API URL is not configured. Set VITE_API_URL and restart the frontend.');
+  if (!apiUrl) throw new ApiError('The API URL is not configured. Set VITE_API_URL and restart the frontend.', 0, 'API_URL_NOT_CONFIGURED');
   const response = await fetch(`${apiUrl}${path}`, { signal });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new ApiError(payload.error ?? `The salon server returned ${response.status}.`, response.status, payload.code);
@@ -44,7 +46,7 @@ async function requestJson<T>(path: string, signal?: AbortSignal): Promise<T> {
 }
 
 async function requestJsonWithInit<T>(path: string, init: RequestInit): Promise<T> {
-  if (!apiUrl) throw new Error('The API URL is not configured. Set VITE_API_URL and restart the frontend.');
+  if (!apiUrl) throw new ApiError('The API URL is not configured. Set VITE_API_URL and restart the frontend.', 0, 'API_URL_NOT_CONFIGURED');
   const response = await fetch(`${apiUrl}${path}`, init);
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new ApiError(payload.error ?? `The salon server returned ${response.status}.`, response.status, payload.code);
@@ -68,6 +70,11 @@ export const cancelQueueSpot = (id: string) => requestJsonWithInit<QueueSpotResp
 export const staffLogin = (pin: string) => requestJsonWithInit<{ token: string }>('/api/staff/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin }) });
 export const staffLogout = (token: string) => staffRequest<{ loggedOut: boolean }>('/api/staff/logout', token, 'POST');
 export const fetchReception = (token: string) => staffRequest<ReceptionData>('/api/reception', token);
+export const fetchBarberView = (token: string, name: string) => staffRequest<BarberView>(`/api/barbers/${encodeURIComponent(name)}/view`, token);
+export const barberStartCustomer = (token: string, id: string, barberId: number) => staffRequest<QueueSpotResponse>(`/api/queue/${encodeURIComponent(id)}/start`, token, 'POST', { barberId });
+export const barberFinishCustomer = (token: string, id: string, barberId: number) => staffRequest<QueueSpotResponse>(`/api/queue/${encodeURIComponent(id)}/done`, token, 'POST', { barberId });
+export const setBarberBreak = (token: string, barberId: number, onBreak: boolean) => staffRequest<{ barber: { id: number; name: string; status: string } }>(`/api/barbers/${barberId}/break`, token, 'POST', { onBreak });
+export const fetchDisplay = (signal?: AbortSignal) => requestJson<DisplayData>('/api/display', signal);
 export const createWalkIn = (token: string, body: { name: string; phone: string; serviceIds: number[]; barber: string; requestId: string }) => staffRequest<QueueSpotResponse>('/api/reception/walk-in', token, 'POST', body);
 export const callNextCustomer = (token: string, barberId: number) => staffRequest<QueueSpotResponse>('/api/reception/call-next', token, 'POST', { barberId });
 export const cancelWaitingCustomer = (token: string, id: string) => staffRequest<QueueSpotResponse>(`/api/reception/${encodeURIComponent(id)}/cancel`, token, 'POST');

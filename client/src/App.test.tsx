@@ -22,11 +22,12 @@ const barbers = [
 ];
 const salonStatus = (onlineJoiningOpen = true) => ({ isOpen: true, status: 'open', openingTime: '10:00', closingTime: '21:00', onlineJoiningOpen, onlineJoiningEnabled: true, waitingCount: 0, estimatedWaitMinutes: 0, currentTime: '12:00:00', timezone: 'Asia/Kolkata', override: null });
 
-function mockApi({ joiningOpen = true, onEstimate, spotStatus = 'Waiting', previousDay = false, loginRejected = false }: { joiningOpen?: boolean; onEstimate?: (ids: number[], barber: string) => object; spotStatus?: string; previousDay?: boolean; loginRejected?: boolean } = {}) {
+function mockApi({ joiningOpen = true, onEstimate, spotStatus = 'Waiting', previousDay = false, loginCode, loginNetworkFailure = false }: { joiningOpen?: boolean; onEstimate?: (ids: number[], barber: string) => object; spotStatus?: string; previousDay?: boolean; loginCode?: string; loginNetworkFailure?: boolean } = {}) {
   const methods: string[] = [];
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     methods.push(init?.method ?? 'GET');
     const url = new URL(String(input), 'http://test');
+    if (loginNetworkFailure && url.pathname === '/api/staff/login') throw new TypeError('Failed to fetch');
     let body: unknown = { status: 'ok', service: 'salon-api' };
     if (url.pathname === '/api/services') body = { services };
     if (url.pathname === '/api/barbers') body = { barbers };
@@ -41,15 +42,17 @@ function mockApi({ joiningOpen = true, onEstimate, spotStatus = 'Waiting', previ
     if (url.pathname === '/api/queue/5' && (!init?.method || init.method === 'GET')) body = { spot };
     if (url.pathname === '/api/staff/login') body = { token: 'staff-token' };
     if (url.pathname === '/api/reception') body = { date: '2026-11-24', barbers: [{ id: 1, name: 'Ravi', avatar: '👨🏽‍🦱', status: 'free', currentCustomer: null }], waitingList: [{ ...spot, id: '7', token: 'S-7', name: 'Rina Shah', status: 'Waiting', preferredBarber: 'any', waitingMinutes: 4, minutesWaited: 4, statusMinutes: 4, canMarkNoShow: false, services: [{ ...spot.services[0], quantity: 1 }] }], called: [], inChair: [] };
-    const failedLogin = loginRejected && url.pathname === '/api/staff/login';
-    if (failedLogin) body = { error: 'That staff PIN is incorrect.', code: 'INVALID_STAFF_PIN' };
-    return { ok: !failedLogin, status: failedLogin ? 401 : 200, json: async () => body } as Response;
+    if (url.pathname === '/api/barbers/Ravi/view') body = { barber: { id: 1, name: 'Ravi', avatar: '✂', status: 'free', currentCustomer: null }, nextCustomer: null };
+    if (url.pathname === '/api/display') body = { date: '2026-11-24', barbers: [{ id: 1, name: 'Ravi', avatar: '✂', status: 'free', currentToken: null }], upNext: [{ id: '8', token: 'S-8', name: 'Kunal', barber: 'any', expectedWaitMinutes: 10 }] };
+    const failedLogin = Boolean(loginCode) && url.pathname === '/api/staff/login';
+    if (failedLogin) body = loginCode === 'STAFF_PIN_NOT_CONFIGURED' ? { error: 'Staff PIN is not configured on the server.', code: loginCode } : { error: 'That staff PIN is incorrect.', code: loginCode };
+    return { ok: !failedLogin, status: !failedLogin ? 200 : loginCode === 'STAFF_PIN_NOT_CONFIGURED' ? 503 : 401, json: async () => body } as Response;
   });
   vi.stubGlobal('fetch', fetchMock);
   return { fetchMock, methods };
 }
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); localStorage.clear(); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); localStorage.clear(); sessionStorage.clear(); });
 
 function renderAt(path: string) { return render(<MemoryRouter initialEntries={[path]}><App /></MemoryRouter>); }
 
@@ -136,23 +139,41 @@ describe('salon screens', () => {
     expect(screen.queryByRole('button', { name: 'Cancel my spot' })).toBeNull();
   });
 
-  it('keeps the unrequested reception, barber, display and admin screens as placeholders', async () => {
+  it('renders Barber View and the public TV display while keeping Admin as a placeholder', async () => {
     mockApi();
-    const cases: [string, string][] = [['/barber/Mira', 'Barber workspace'], ['/display', 'Salon display'], ['/admin', 'Salon admin']];
-    for (const [path, title] of cases) {
-      cleanup(); renderAt(path);
-      expect(await screen.findByRole('heading', { name: title })).toBeTruthy();
-      expect(screen.getByText('This is a placeholder page. Salon features will be added in a later step.')).toBeTruthy();
-    }
+    sessionStorage.setItem('salon-staff-token', 'staff-token'); renderAt('/barber/Ravi');
+    expect(await screen.findByRole('heading', { name: 'Barber workspace' })).toBeTruthy();
+    expect(await screen.findByText('No one waiting for you')).toBeTruthy();
+    cleanup(); renderAt('/display');
+    expect(await screen.findByRole('heading', { name: 'Salon display' })).toBeTruthy();
+    expect(await screen.findByText('S-8')).toBeTruthy();
+    expect(screen.queryByRole('navigation')).toBeNull();
+    cleanup(); renderAt('/admin');
+    expect(await screen.findByRole('heading', { name: 'Salon admin' })).toBeTruthy();
+    expect(screen.getByText('This is a placeholder page. Salon features will be added in a later step.')).toBeTruthy();
   });
 
   it('requires a staff PIN before showing Reception and reports a wrong PIN clearly', async () => {
-    const user = userEvent.setup(); mockApi({ loginRejected: true }); renderAt('/reception');
+    const user = userEvent.setup(); mockApi({ loginCode: 'INVALID_STAFF_PIN' }); renderAt('/reception');
     expect(await screen.findByRole('heading', { name: 'Staff login' })).toBeTruthy();
     await user.type(screen.getByLabelText('Staff PIN'), 'wrong');
     await user.click(screen.getByRole('button', { name: 'Staff login' }));
     expect((await screen.findByRole('alert')).textContent).toContain('That PIN is incorrect. Try again.');
     expect(screen.queryByText('Rina Shah')).toBeNull();
+  });
+
+  it('explains when STAFF_PIN is missing on the backend', async () => {
+    const user = userEvent.setup(); mockApi({ loginCode: 'STAFF_PIN_NOT_CONFIGURED' }); renderAt('/reception');
+    await user.type(await screen.findByLabelText('Staff PIN'), '1234');
+    await user.click(screen.getByRole('button', { name: 'Staff login' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('The server has no staff PIN configured.');
+  });
+
+  it('shows a useful message when the login API cannot be reached', async () => {
+    const user = userEvent.setup(); mockApi({ loginNetworkFailure: true }); renderAt('/reception');
+    await user.type(await screen.findByLabelText('Staff PIN'), '1234');
+    await user.click(screen.getByRole('button', { name: 'Staff login' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('Could not reach the staff login service.');
   });
 
   it('logs in with the staff token and shows the Reception waiting list', async () => {

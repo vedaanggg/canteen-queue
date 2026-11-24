@@ -116,7 +116,7 @@ export function createQueueRulesService({
     const services = query(getDatabase(), 'SELECT source_service_id AS sourceServiceId, name_en AS nameEn, name_gu AS nameGu, duration_minutes AS durationMinutes, price FROM queue_entry_services WHERE queue_entry_id = ? ORDER BY id', [spot.id]);
     const previousDay = spot.token_day !== today;
     const metrics = previousDay ? { position: null, waitingCount: 0, expectedWaitMinutes: null, isBarberOnBreak: false } : calculateWait({ barber: spot.barber, targetId: spot.id, totalMinutes: Number(spot.total_minutes), createdAt: spot.created_at });
-    return { id: String(spot.id), token: spot.token, tokenNumber: Number(spot.token_number), tokenDay: spot.token_day, name: spot.name, phone: spot.phone, barber: spot.barber, assignedBarber: spot.assigned_barber ?? null, status: spot.status, services, totalMinutes: Number(spot.total_minutes), totalPrice: Number(spot.total_price), createdAt: spot.created_at, statusUpdatedAt: spot.status_updated_at, previousDay, readOnly: previousDay, ...metrics };
+    return { id: String(spot.id), token: spot.token, tokenNumber: Number(spot.token_number), tokenDay: spot.token_day, name: spot.name, phone: spot.phone, barber: spot.barber, assignedBarber: spot.assigned_barber ?? null, status: spot.status, services, totalMinutes: Number(spot.total_minutes), totalPrice: Number(spot.total_price), createdAt: spot.created_at, statusUpdatedAt: spot.status_updated_at, startedAt: spot.started_at ?? null, finishedAt: spot.finished_at ?? null, previousDay, readOnly: previousDay, ...metrics };
   }
 
   function getReceptionData() {
@@ -185,11 +185,94 @@ export function createQueueRulesService({
       if (calledMinutes < 10) throw new CatalogError('No-show is available after 10 minutes.', 409, 'NO_SHOW_TOO_EARLY');
       db.run("UPDATE queue_entries SET status = 'No-show', status_updated_at = ? WHERE id = ? AND status = 'Called'", [now.toISOString(), id]);
       if (Number(query(db, 'SELECT changes() AS count')[0].count) !== 1) throw new CatalogError('This spot has already changed. Refresh and try again.', 409, 'QUEUE_CONFLICT');
-      if (entry.assigned_barber) db.run("UPDATE barbers SET status = 'free' WHERE name = ? AND status = 'busy' AND NOT EXISTS (SELECT 1 FROM queue_entries WHERE assigned_barber = ? AND status IN ('Called', 'In chair') AND id != ?)", [entry.assigned_barber, entry.assigned_barber, id]);
+      if (entry.assigned_barber) db.run("UPDATE barbers SET status = 'free' WHERE name = ? AND status = 'busy' AND NOT EXISTS (SELECT 1 FROM queue_entries WHERE token_day = ? AND assigned_barber = ? AND status IN ('Called', 'In chair') AND id != ?)", [entry.assigned_barber, today, entry.assigned_barber, id]);
       db.run('COMMIT'); persist();
       return getSpot(query(db, 'SELECT * FROM queue_entries WHERE id = ?', [id])[0]);
     } catch (error) { try { db.run('ROLLBACK'); } catch { /* transaction already ended */ } throw error; }
   }
 
-  return { getStatus, estimate, calculateWait, getSpot, getReceptionData, callNext, cancelWaiting, markNoShow, getSalonDayKey: (date = clock()) => getSalonDayKey(date, timezone) };
+  function getBarberView(name) {
+    const db = getDatabase(); const today = getSalonDayKey(clock(), timezone);
+    const barber = query(db, 'SELECT id, name, avatar, status, is_on_duty AS isOnDuty FROM barbers WHERE lower(name) = lower(?)', [name])[0];
+    if (!barber || !Number(barber.isOnDuty)) throw new CatalogError('We could not find that barber on today’s roster.', 404, 'BARBER_NOT_FOUND');
+    const active = query(db, "SELECT * FROM queue_entries WHERE token_day = ? AND assigned_barber = ? AND status IN ('Called', 'In chair') ORDER BY token_number LIMIT 1", [today, barber.name])[0];
+    const currentCustomer = active ? getReceptionData().called.concat(getReceptionData().inChair).find((entry) => Number(entry.id) === Number(active.id)) ?? getSpot(active) : null;
+    const nextRow = query(db, "SELECT * FROM queue_entries WHERE token_day = ? AND status = 'Waiting' AND (lower(barber) = lower(?) OR lower(barber) = 'any') ORDER BY token_number LIMIT 1", [today, barber.name])[0];
+    const nextCustomer = nextRow ? getSpot(nextRow) : null;
+    return { barber: { id: Number(barber.id), name: barber.name, avatar: barber.avatar, status: barber.status, currentCustomer }, nextCustomer };
+  }
+
+  function startService(id, barberId) {
+    const db = getDatabase(); const now = clock(); const today = getSalonDayKey(now, timezone);
+    db.run('BEGIN IMMEDIATE');
+    try {
+      const barber = query(db, 'SELECT id, name FROM barbers WHERE id = ? AND is_on_duty = 1', [barberId])[0];
+      if (!barber) throw new CatalogError('This barber is not on duty.', 409, 'BARBER_UNAVAILABLE');
+      const entry = query(db, 'SELECT * FROM queue_entries WHERE id = ?', [id])[0];
+      if (!entry) throw new CatalogError('Spot not found.', 404, 'SPOT_NOT_FOUND');
+      if (entry.token_day !== today) throw new CatalogError('Previous-day spots are read-only.', 409, 'SPOT_READ_ONLY');
+      if (entry.status !== 'Called') throw new CatalogError('Only a Called customer can be started.', 409, 'START_NOT_ALLOWED');
+      if (entry.assigned_barber?.toLowerCase() !== barber.name.toLowerCase()) throw new CatalogError('Only the assigned barber can start this customer.', 403, 'WRONG_ASSIGNED_BARBER');
+      const otherCustomer = query(db, "SELECT id FROM queue_entries WHERE token_day = ? AND assigned_barber = ? AND status IN ('Called', 'In chair') AND id != ? LIMIT 1", [today, barber.name, id])[0];
+      if (otherCustomer) throw new CatalogError('This barber already has another active customer.', 409, 'BARBER_ALREADY_RESERVED');
+      const timestamp = now.toISOString();
+      db.run("UPDATE queue_entries SET status = 'In chair', started_at = ?, status_updated_at = ? WHERE id = ? AND status = 'Called'", [timestamp, timestamp, id]);
+      if (Number(query(db, 'SELECT changes() AS count')[0].count) !== 1) throw new CatalogError('This customer’s status changed. Refresh and try again.', 409, 'QUEUE_CONFLICT');
+      db.run('COMMIT'); persist();
+      return getSpot(query(db, 'SELECT * FROM queue_entries WHERE id = ?', [id])[0]);
+    } catch (error) { try { db.run('ROLLBACK'); } catch { /* transaction already ended */ } throw error; }
+  }
+
+  function finishService(id, barberId) {
+    const db = getDatabase(); const now = clock(); const today = getSalonDayKey(now, timezone);
+    db.run('BEGIN IMMEDIATE');
+    try {
+      const barber = query(db, 'SELECT id, name FROM barbers WHERE id = ? AND is_on_duty = 1', [barberId])[0];
+      if (!barber) throw new CatalogError('This barber is not on duty.', 409, 'BARBER_UNAVAILABLE');
+      const entry = query(db, 'SELECT * FROM queue_entries WHERE id = ?', [id])[0];
+      if (!entry) throw new CatalogError('Spot not found.', 404, 'SPOT_NOT_FOUND');
+      if (entry.token_day !== today) throw new CatalogError('Previous-day spots are read-only.', 409, 'SPOT_READ_ONLY');
+      if (entry.status !== 'In chair') throw new CatalogError('Only a customer In chair can be marked Done.', 409, 'DONE_NOT_ALLOWED');
+      if (entry.assigned_barber?.toLowerCase() !== barber.name.toLowerCase()) throw new CatalogError('Only the assigned barber can finish this customer.', 403, 'WRONG_ASSIGNED_BARBER');
+      const timestamp = now.toISOString();
+      db.run("UPDATE queue_entries SET status = 'Done', finished_at = ?, status_updated_at = ? WHERE id = ? AND status = 'In chair'", [timestamp, timestamp, id]);
+      if (Number(query(db, 'SELECT changes() AS count')[0].count) !== 1) throw new CatalogError('This customer’s status changed. Refresh and try again.', 409, 'QUEUE_CONFLICT');
+      db.run("UPDATE barbers SET status = 'free' WHERE id = ? AND status = 'busy' AND NOT EXISTS (SELECT 1 FROM queue_entries WHERE token_day = ? AND assigned_barber = ? AND status IN ('Called', 'In chair') AND id != ?)", [barber.id, today, barber.name, id]);
+      db.run('COMMIT'); persist();
+      return getSpot(query(db, 'SELECT * FROM queue_entries WHERE id = ?', [id])[0]);
+    } catch (error) { try { db.run('ROLLBACK'); } catch { /* transaction already ended */ } throw error; }
+  }
+
+  function setBarberBreak(barberId, onBreak) {
+    if (typeof onBreak !== 'boolean') throw new CatalogError('Provide a valid break setting.', 400, 'INVALID_BREAK_SETTING');
+    const db = getDatabase(); const today = getSalonDayKey(clock(), timezone);
+    db.run('BEGIN IMMEDIATE');
+    try {
+      const barber = query(db, 'SELECT id, name, status FROM barbers WHERE id = ? AND is_on_duty = 1', [barberId])[0];
+      if (!barber) throw new CatalogError('This barber is not on duty.', 409, 'BARBER_UNAVAILABLE');
+      const active = query(db, "SELECT id FROM queue_entries WHERE token_day = ? AND assigned_barber = ? AND status IN ('Called', 'In chair') LIMIT 1", [today, barber.name])[0];
+      if (onBreak && active) throw new CatalogError('A barber cannot go on break while a customer is Called or In chair.', 409, 'BARBER_HAS_ACTIVE_CUSTOMER');
+      if (!onBreak && active) throw new CatalogError('This barber has an active customer and cannot be marked available.', 409, 'BARBER_HAS_ACTIVE_CUSTOMER');
+      const nextStatus = onBreak ? 'on_break' : 'free';
+      db.run('UPDATE barbers SET status = ? WHERE id = ?', [nextStatus, barber.id]);
+      db.run('COMMIT'); persist();
+      return { id: Number(barber.id), name: barber.name, status: nextStatus };
+    } catch (error) { try { db.run('ROLLBACK'); } catch { /* transaction may already have ended */ } throw error; }
+  }
+
+  function getDisplayData() {
+    const db = getDatabase(); const today = getSalonDayKey(clock(), timezone);
+    const activeEntries = query(db, "SELECT * FROM queue_entries WHERE token_day = ? AND status IN ('Called', 'In chair') ORDER BY token_number", [today]);
+    const barbers = query(db, 'SELECT id, name, avatar, status FROM barbers WHERE is_on_duty = 1 ORDER BY id').map((barber) => {
+      const current = activeEntries.find((entry) => entry.assigned_barber?.toLowerCase() === barber.name.toLowerCase());
+      return { id: Number(barber.id), name: barber.name, avatar: barber.avatar, status: barber.status === 'on_break' ? 'on_break' : current?.status === 'In chair' ? 'in_chair' : current ? 'called' : 'free', currentToken: current?.token ?? null };
+    });
+    const waiting = query(db, "SELECT * FROM queue_entries WHERE token_day = ? AND status = 'Waiting' ORDER BY token_number LIMIT 5", [today]).map((entry) => {
+      const spot = getSpot(entry);
+      return { id: spot.id, token: spot.token, name: spot.name, barber: spot.barber, expectedWaitMinutes: spot.expectedWaitMinutes };
+    });
+    return { date: today, barbers, upNext: waiting };
+  }
+
+  return { getStatus, estimate, calculateWait, getSpot, getReceptionData, getBarberView, getDisplayData, callNext, cancelWaiting, markNoShow, startService, finishService, setBarberBreak, getSalonDayKey: (date = clock()) => getSalonDayKey(date, timezone) };
 }

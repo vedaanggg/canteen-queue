@@ -3,11 +3,18 @@ import { Link } from 'react-router-dom';
 import { fetchQueueSpot } from '../lib/api';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useSalonData } from '../state/useSalonData';
+import { socket } from '../lib/socket';
 
 export default function HomePage() {
   const { t } = useLanguage();
   const { barbers, status, loading, error, refresh } = useSalonData();
   const [activeSpotId, setActiveSpotId] = useState<string | null>(null);
+  useEffect(() => {
+    const liveSocket = socket; if (!liveSocket) return;
+    const update = () => void refresh();
+    liveSocket.on('queue:updated', update);
+    return () => { liveSocket.off('queue:updated', update); };
+  }, [refresh]);
   useEffect(() => {
     let disposed = false;
     const check = async () => {
