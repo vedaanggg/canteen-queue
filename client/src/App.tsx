@@ -3,19 +3,11 @@ import { useEffect, useState } from 'react';
 import { socket } from './lib/socket';
 import CartPage from './screens/CartPage';
 import MenuPage from './screens/MenuPage';
+import OrderStatusPage from './screens/OrderStatusPage';
 import { CartProvider } from './state/CartContext';
 import { CanteenDataProvider } from './state/CanteenDataContext';
 
 const apiUrl = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '');
-
-const pages = [
-  { path: '/', label: 'Menu' },
-  { path: '/cart', label: 'Cart' },
-  { path: '/order/placeholder', label: 'Order status' },
-  { path: '/kitchen', label: 'Kitchen' },
-  { path: '/display', label: 'Display' },
-  { path: '/admin', label: 'Owner' },
-];
 
 function PlaceholderPage({ title }: { title: string }) {
   return (
@@ -72,6 +64,12 @@ export default function App() {
 function AppShell() {
   const location = useLocation();
   const isDisplay = location.pathname === '/display';
+  const lastOrderId = localStorage.getItem('canteen-queue-last-order-id');
+  const pages = [
+    { path: '/', label: 'Menu' }, { path: '/cart', label: 'Cart' },
+    { path: lastOrderId ? `/order/${lastOrderId}` : '/order/placeholder', label: 'Order status' },
+    { path: '/kitchen', label: 'Kitchen' }, { path: '/display', label: 'Display' }, { path: '/admin', label: 'Owner' },
+  ];
 
   return (
     <div className="min-h-screen bg-orange-50/50">
@@ -92,7 +90,7 @@ function AppShell() {
       <Routes>
         <Route path="/" element={<MenuPage />} />
         <Route path="/cart" element={<CartPage />} />
-        <Route path="/order/:id" element={<PlaceholderPage title="Order status" />} />
+        <Route path="/order/:id" element={<OrderStatusPage />} />
         <Route path="/kitchen" element={<PlaceholderPage title="Kitchen board" />} />
         <Route path="/display" element={<PlaceholderPage title="Now serving" />} />
         <Route path="/admin" element={<PlaceholderPage title="Menu manager" />} />

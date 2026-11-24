@@ -24,10 +24,10 @@ remain marked planned.
 | GET | `/api/health` | Confirm the backend and SQLite are available. Returns `{ "status": "ok", "service": "canteen-queue-api" }`. | Implemented in Step 1 |
 | GET | `/api/status` | Return ordering availability and current canteen time. | Implemented |
 | GET | `/api/menu` | Return menu items, including sold-out items, and categories. | Implemented |
-| POST | `/api/orders` | Create an order with an idempotency request ID; server validates and calculates prices/totals. | Planned |
-| GET | `/api/orders/:id` | Return order details and saved status. | Planned |
+| POST | `/api/orders` | Create an order with a UUID idempotency request ID; validates availability/open hours and calculates prices/totals on the server. | Implemented |
+| GET | `/api/orders/:id` | Return order details, saved status, queue estimate and previous-day read-only flags. | Implemented |
 | PATCH | `/api/orders/:id/status` | Advance an order through valid staff status transitions. | Planned |
-| POST | `/api/orders/:id/cancel` | Cancel a Placed order. | Planned |
+| POST | `/api/orders/:id/cancel` | Cancel an order only while status is Placed. | Implemented |
 | GET/POST/PATCH/DELETE | `/api/admin/menu-items` | List, add, edit, or delete menu items. | Planned |
 | GET | `/api/admin/summary` | Return today's order count, item quantity total, and top seller. | Planned |
 
@@ -36,9 +36,10 @@ remain marked planned.
 - `menu_items`: menu name, category, whole-rupee price, description, emoji,
   veg flag, availability, and creation/update timestamps. If empty at startup,
   the backend seeds 19 sample canteen items across the four fixed categories.
-- `orders`: UUID order ID, unique request ID, daily token, IST service day,
-  student and roll details, status, total, and timestamps. Token numbers are
-  unique within a service day.
+- `orders`: UUID order ID, unique request ID, daily token, service day in
+  `CANTEEN_TIMEZONE`, student and roll details, status, total, and timestamps.
+  Tokens start at 1 each day, are allocated transactionally, and stay consumed
+  after cancellation.
 - `order_items`: order reference and a snapshot of item name, unit price,
   quantity, and line total so menu edits do not change past orders.
 
@@ -48,11 +49,13 @@ remain marked planned.
 | --- | --- | --- | --- | --- |
 | Server → client | `connection:ready` | `{ connected: true }` | Confirm the realtime connection. | Implemented in Step 1 |
 | Server → clients | `menu:updated` | Updated menu item or menu snapshot (to be finalized with menu API). | Refresh menu views after owner changes. | Planned |
-| Server → clients | `order:created` | Created order summary. | Add a new order to kitchen and customer views. | Planned |
+| Server → clients | `order:created` | `{ id, status, tokenNumber, serviceDay }` | Notify connected order and kitchen views. | Implemented |
 | Server → clients | `order:updated` | Updated order summary/status. | Synchronize kitchen, tracking, and display views. | Planned |
-| Server → clients | `order:cancelled` | Cancelled order ID and status. | Remove cancelled orders from active views. | Planned |
+| Server → clients | `order:cancelled` | `{ id, status, tokenNumber, serviceDay }` | Notify connected order and kitchen views. | Implemented |
 
-Event payload details will be finalized alongside their corresponding features.
+Order create/cancel events carry a compact summary object as shown above. The
+`order:updated` event remains planned until staff order status controls are
+implemented.
 
 ## Implemented response shapes
 
@@ -89,6 +92,30 @@ Returns HTTP 200 with `isOpen`, `status` (`open` or `closed`), `openingTime`
 Opening and cutoff decisions use the configured timezone. The cutoff is exclusive:
 ordering is closed at 4:45:00 PM. A test override takes precedence over the clock.
 
-The frontend requests `/api/menu` and `/api/status` from `VITE_API_URL`. It
-refreshes status every 30 seconds and refetches menu data on `menu:updated`.
-No order creation endpoint is called from the Cart screen in this step.
+### Orders
+
+`POST /api/orders` accepts `{ requestId, studentName, rollNumber, items }`,
+where `requestId` is a UUID and each item is `{ id, quantity }`. Name and roll
+number are required, the cart must be non-empty, each quantity must be 1–10,
+and every menu item must exist and be available. The backend rejects closed
+ordering hours, looks up current menu prices, calculates the total, and saves
+item name/price snapshots. A browser-supplied total is ignored. A new order
+returns HTTP 201 with `{ order, duplicate: false }`; reusing a request ID returns
+HTTP 200 with the original `{ order, duplicate: true }` without creating a
+second order. Errors return `{ error, code }`.
+
+`GET /api/orders/:id` returns `{ order }`, including order items, status,
+`ordersAhead`, `isPreviousDay`, and `readOnly`. `ordersAhead` counts smaller
+tokens from the same day whose status is Placed or Preparing. For previous-day
+orders the last saved status is returned with `isPreviousDay: true`,
+`readOnly: true`, and `ordersAhead: null`; those orders cannot be cancelled.
+
+`POST /api/orders/:id/cancel` returns `{ order }` after changing a current-day
+Placed order to the final status Cancelled. Other statuses and previous-day
+orders are rejected. Token numbers are not reused after cancellation.
+
+The frontend calls these endpoints through `VITE_API_URL`. Order Status listens
+for `order:created`, `order:updated`, and `order:cancelled`; while Socket.IO is
+disconnected it refreshes current-day orders every five seconds. `order:updated`
+is subscribed for the later Kitchen Board implementation; no staff status
+mutation endpoint is available in this step.

@@ -1,18 +1,21 @@
 import { useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { submitOrder } from '../lib/api';
 import { useCart } from '../state/CartContext';
 import { useCanteenData } from '../state/CanteenDataContext';
 
 const money = (amount: number) => `₹${amount}`;
 
 export default function CartPage() {
-  const { lines, itemCount, total, decrement, increment, remove, notice, clearNotice } = useCart();
+  const { lines, itemCount, total, decrement, increment, remove, clear, notice, clearNotice } = useCart();
+  const navigate = useNavigate();
   const { orderingStatus, loading, error, refresh } = useCanteenData();
   const [studentName, setStudentName] = useState('');
   const [rollNumber, setRollNumber] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   if (loading) return <main className="mx-auto flex min-h-[55vh] max-w-3xl flex-col items-center justify-center px-5 text-center"><span className="animate-pulse text-4xl" aria-hidden="true">🛒</span><h1 className="mt-4 text-2xl font-extrabold text-slate-900">Loading your cart…</h1></main>;
   if (error) return <main className="mx-auto flex min-h-[55vh] max-w-xl flex-col items-center justify-center px-5 text-center"><span aria-hidden="true" className="text-4xl">⚠️</span><h1 className="mt-4 text-2xl font-extrabold text-slate-900">We couldn’t load your cart</h1><p className="mt-2 text-slate-600">{error}</p><button type="button" onClick={() => void refresh()} className="mt-5 min-h-11 rounded-full bg-canteen px-5 font-bold text-white">Try again</button></main>;
@@ -21,7 +24,7 @@ export default function CartPage() {
   const nameError = submitted && !studentName.trim();
   const rollError = submitted && !rollNumber.trim();
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitted(true);
     setValidationMessage(null);
@@ -38,7 +41,15 @@ export default function CartPage() {
       setValidationMessage('Ordering is closed right now. Please come back during canteen hours.');
       return;
     }
-    setSuccessMessage('Details look good. Order placement will be available in the next step.');
+    setSubmitting(true);
+    try {
+      const result = await submitOrder({ requestId: crypto.randomUUID(), studentName: studentName.trim(), rollNumber: rollNumber.trim(), items: lines.map(({ item, quantity }) => ({ id: item.id, quantity })) });
+      localStorage.setItem('canteen-queue-last-order-id', result.order.id);
+      clear();
+      navigate(`/order/${result.order.id}`);
+    } catch (err) {
+      setValidationMessage(err instanceof Error ? err.message : 'Unable to place your order. Please try again.');
+    } finally { setSubmitting(false); }
   }
 
   return (
@@ -98,8 +109,8 @@ export default function CartPage() {
             <div className="my-5 flex justify-between border-t border-slate-100 pt-4 text-lg font-black text-slate-900"><span>Total</span><span>{money(total)}</span></div>
             {validationMessage && <p role="alert" className="mb-3 rounded-xl bg-red-50 px-3 py-2.5 text-sm font-medium text-red-800">{validationMessage}</p>}
             {successMessage && <p role="status" className="mb-3 rounded-xl bg-emerald-50 px-3 py-2.5 text-sm font-medium text-emerald-800">{successMessage}</p>}
-            <button type="submit" disabled={!lines.length || !isOpen} className="min-h-14 w-full rounded-2xl bg-canteen px-5 text-base font-extrabold text-white shadow-sm transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 disabled:shadow-none">Place Order</button>
-            <p className="mt-3 text-center text-xs leading-relaxed text-slate-500">You won’t be charged online. Payment and order placement will be added later.</p>
+            <button type="submit" disabled={!lines.length || !isOpen || submitting} className="min-h-14 w-full rounded-2xl bg-canteen px-5 text-base font-extrabold text-white shadow-sm transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 disabled:shadow-none">{submitting ? 'Placing order…' : 'Place Order'}</button>
+            <p className="mt-3 text-center text-xs leading-relaxed text-slate-500">You won’t be charged online.</p>
           </form>
         </div>
       )}

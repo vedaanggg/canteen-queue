@@ -50,6 +50,7 @@ export async function initializeDatabase() {
     line_total INTEGER NOT NULL
   );
 `);
+  db.run('CREATE INDEX IF NOT EXISTS orders_day_status_token_idx ON orders(service_day, status, token_number)');
   ensureMenuItemColumn('emoji', "TEXT NOT NULL DEFAULT '🍽️'");
   seedMenuIfEmpty();
   persistDatabase();

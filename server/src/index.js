@@ -10,6 +10,7 @@ const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
   cors: { origin: config.clientOrigin, methods: ['GET', 'POST'] },
 });
+app.locals.io = io;
 
 io.on('connection', (socket) => {
   socket.emit('connection:ready', { connected: true });

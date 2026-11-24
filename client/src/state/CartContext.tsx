@@ -17,6 +17,7 @@ interface CartValue {
   increment: (itemId: number) => void;
   decrement: (itemId: number) => void;
   remove: (itemId: number) => void;
+  clear: () => void;
 }
 
 const storageKey = 'canteen-queue-cart-v1';
@@ -94,14 +95,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const remove = useCallback((itemId: number) => {
     setLines((current) => current.filter((line) => line.item.id !== itemId));
   }, []);
+  const clear = useCallback(() => setLines([]), []);
 
   const itemCount = lines.reduce((count, line) => count + line.quantity, 0);
   const total = lines.reduce((sum, line) => sum + line.item.price * line.quantity, 0);
   const value = useMemo(() => ({
     lines, itemCount, total, notice,
     clearNotice: () => setNotice(null),
-    add, increment, decrement, remove,
-  }), [lines, itemCount, total, notice, add, increment, decrement, remove]);
+    add, increment, decrement, remove, clear,
+  }), [lines, itemCount, total, notice, add, increment, decrement, remove, clear]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

@@ -29,6 +29,10 @@ function mockApi(status = openStatus) {
       ? { categories: ['Snacks', 'Meals', 'Beverages', 'Desserts'], items: menuItems }
       : url.endsWith('/api/status')
         ? status
+        : url.endsWith('/api/orders')
+          ? { order: { id: 'order-123', tokenNumber: 1, serviceDay: '2026-11-24', studentName: 'Aditi Sharma', rollNumber: 'CS24-018', status: 'Placed', total: 20, items: [{ menuItemId: 1, itemName: 'Samosa', unitPrice: 20, quantity: 1, lineTotal: 20 }], ordersAhead: 0, isPreviousDay: false, readOnly: false }, duplicate: false }
+        : url.includes('/api/orders/')
+          ? { order: { id: 'order-123', tokenNumber: 1, serviceDay: '2026-11-24', studentName: 'Aditi Sharma', rollNumber: 'CS24-018', status: 'Placed', total: 20, items: [{ menuItemId: 1, itemName: 'Samosa', unitPrice: 20, quantity: 1, lineTotal: 20 }], ordersAhead: 0, isPreviousDay: false, readOnly: false } }
         : { status: 'ok', service: 'canteen-queue-api' };
     return { ok: true, status: 200, json: async () => body } as Response;
   });
@@ -126,8 +130,12 @@ describe('Menu and Cart screens', () => {
 
     await user.type(screen.getByLabelText('Student name'), 'Aditi Sharma');
     await user.type(screen.getByLabelText('Roll number'), 'CS24-018');
+    vi.stubGlobal('crypto', { ...crypto, randomUUID: () => '123e4567-e89b-42d3-a456-426614174000' });
     await user.click(screen.getByRole('button', { name: 'Place Order' }));
-    expect(screen.getByText(/Order placement will be available in the next step/)).toBeTruthy();
+    await waitFor(() => expect(localStorage.getItem('canteen-queue-last-order-id')).toBe('order-123'));
+    expect(localStorage.getItem('canteen-queue-cart-v1')).toBe('[]');
+    expect(await screen.findByText('Aditi Sharma')).toBeTruthy();
+    expect(screen.getByText("You're next")).toBeTruthy();
   });
 
   it('keeps the cart quantity capped at ten', async () => {
@@ -163,5 +171,34 @@ describe('Menu and Cart screens', () => {
     renderAt('/cart');
     expect(await screen.findByRole('button', { name: 'Place Order' })).toHaveProperty('disabled', true);
     expect(screen.getByText('Ordering closed')).toBeTruthy();
+  });
+
+  it('shows previous-day orders read-only after loading the same order on refresh', async () => {
+    const oldOrder = { id: 'old-123', tokenNumber: 7, serviceDay: '2026-11-23', studentName: 'Aditi Sharma', rollNumber: 'CS24-018', status: 'Preparing', total: 20, items: [{ menuItemId: 1, itemName: 'Samosa', unitPrice: 20, quantity: 1, lineTotal: 20 }], ordersAhead: null, isPreviousDay: true, readOnly: true };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => ({ ok: true, status: 200, json: async () => String(input).includes('/api/orders/') ? { order: oldOrder } : String(input).endsWith('/api/menu') ? { categories: [], items: menuItems } : openStatus } as Response));
+    vi.stubGlobal('fetch', fetchMock);
+    renderAt('/order/old-123');
+    expect(await screen.findByText('This order is from a previous day.')).toBeTruthy();
+    expect(screen.getByLabelText('Token 7')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Cancel order' })).toBeNull();
+    expect(screen.queryByText(/Estimated wait/)).toBeNull();
+    cleanup();
+    renderAt('/order/old-123');
+    expect(await screen.findByText('This order is from a previous day.')).toBeTruthy();
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/api/orders/old-123'))).toBe(true);
+  });
+
+  it('displays a clear backend error when order placement fails', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith('/api/orders')) return { ok: false, status: 409, json: async () => ({ error: 'Ordering is closed right now.' }) } as Response;
+      return { ok: true, status: 200, json: async () => String(input).endsWith('/api/menu') ? { categories: ['Snacks'], items: menuItems } : openStatus } as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    savedCart(); renderAt('/cart');
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Student name'), 'Aditi');
+    await user.type(screen.getByLabelText('Roll number'), 'CS24');
+    await user.click(screen.getByRole('button', { name: 'Place Order' }));
+    expect(await screen.findByText('Ordering is closed right now.')).toBeTruthy();
   });
 });

@@ -3,6 +3,7 @@ import cors from 'cors';
 import { healthRouter } from './routes/health.js';
 import { menuRouter } from './routes/menu.js';
 import { statusRouter } from './routes/status.js';
+import { ordersRouter } from './routes/orders.js';
 import { config } from './config/env.js';
 
 export function createApp() {
@@ -14,5 +15,6 @@ export function createApp() {
   app.use('/api', healthRouter);
   app.use('/api', menuRouter);
   app.use('/api', statusRouter);
+  app.use('/api', ordersRouter);
   return app;
 }
