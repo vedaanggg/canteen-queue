@@ -116,3 +116,52 @@ Backend (all queue rules stay in the ONE existing rules module):
   It joins at the end of the queue.
 - POST /api/reception/call-next with a barber id. The barber must be on duty,
   Available (not on break) and have no Called or In
+
+
+Read AGENTS.md and docs/.
+
+First, a small bug fix. On /reception, entering the staff PIN shows "Unable to
+verify staff access." even though STAFF_PIN is set to 1234. Find the cause by
+testing POST /api/staff/login against the running backend (curl) and the
+browser request, explain it in 2 lines, and fix it. Add a test that logs in with
+the correct PIN, rejects a wrong PIN, and handles a missing STAFF_PIN with a
+clear message. Show the frontend a clear error for each case. Then continue.
+
+Build only Screen 5 (Barber View, /barber/:name) and Screen 6 (Waiting Area TV,
+/display) from docs/02-screens.md and docs/03-flows-rules.md. Do not build Owner
+Settings. Do not change Reception or other screens, except small changes so they
+react to the new statuses.
+
+Barber View:
+- Needs the staff PIN, reusing the existing staff login and token. The backend
+  rejects barber actions without it. An unknown barber name shows a friendly
+  error.
+- Phone layout: current customer (token, name, services, timer since start), big
+  [ Start ] when the customer is Called, then [ Done ] when In chair. "Next for
+  you: S-15 Kunal (Haircut)" or "No one waiting for you" (earliest Waiting
+  customer who chose this barber or "Any"). Toggle On break / Available.
+- Backend: POST /api/queue/:id/start (only Called -> In chair, only by the
+  assigned barber) and POST /api/queue/:id/done (only In chair -> Done). A barber
+  cannot go on break while a customer is Called or In chair. Enforce
+  forward-only transitions and one customer per chair on the BACKEND, with clear
+  errors, using the existing rules module. Record start and finish times.
+- Emit Socket.IO events on start, done and break changes so Reception, the TV,
+  Home and the customer's My Status update within 5 seconds. My Status must show
+  In chair and Done correctly.
+
+TV display (public, no PIN):
+- GET /api/display returns, for today only, the barbers on duty with their
+  current customer token or Free / On break, and the next 5 Waiting tokens with
+  estimated times.
+- 1920x1080, dark background, gold accents, text readable from 5 metres. One row
+  per barber: avatar, name, "Now: S-12" (or Free / On break). "Up next" list of 5
+  tokens with estimated times. A newly Called token flashes gold for 5 seconds
+  with a best-effort chime. No buttons, no navigation, no refresh needed.
+  Reconnect automatically with a 5-second polling fallback. Empty state text.
+  Labels from the EN/GU file.
+
+Write Vitest tests for: start only from Called, done only from In chair, only the
+assigned barber can start, wrong transitions rejected, break blocked while busy,
+next-for-you picks the right customer, waiting time goes down after Done, and
+the display endpoint output. Update docs/api.md. List changed files and test
+commands, and tell me exactly what you tested and what you did not.
