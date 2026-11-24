@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { healthRouter } from './routes/health.js';
+import { salonRouter } from './routes/salon.js';
 import { config } from './config/env.js';
 
 export function createApp() {
@@ -10,6 +11,7 @@ export function createApp() {
   app.use(cors({ origin: config.clientOrigin }));
   app.use(express.json());
   app.use('/api', healthRouter);
+  app.use('/api', salonRouter);
   app.use('/api', (_request, response) => response.status(404).json({ error: 'API endpoint not found.' }));
   return app;
 }

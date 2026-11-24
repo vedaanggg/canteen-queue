@@ -4,6 +4,8 @@ import { socket } from './lib/socket';
 import { LanguageProvider, useLanguage } from './i18n/LanguageContext';
 import type { TranslationKey } from './i18n/translations';
 import { fetchHealth } from './lib/api';
+import HomePage from './screens/HomePage';
+import JoinQueuePage from './screens/JoinQueuePage';
 
 const pages = [
   { path: '/', key: 'home' }, { path: '/join', key: 'join' }, { path: '/status/demo', key: 'status' },
@@ -47,19 +49,19 @@ function AppShell() {
       <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
         <Link className="text-xl font-extrabold tracking-wide text-white" to="/">{t('brand')}</Link>
         <nav aria-label={t('temporaryNav')} className="flex flex-wrap gap-2">
-          {pages.map((page) => <Link key={page.path} to={page.path} className="rounded-full border border-white/15 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-gold hover:text-gold">{t(page.key)}</Link>)}
+          {pages.map((page) => <Link key={page.path} to={page.path} className="inline-flex min-h-11 items-center rounded-full border border-white/15 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-gold hover:text-gold">{t(page.key)}</Link>)}
         </nav>
         <div className="flex items-center gap-3">
           <span className="text-xs font-bold uppercase tracking-widest text-slate-400">{t('language')}</span>
-          <button type="button" onClick={() => setLanguage(language === 'en' ? 'gu' : 'en')} className="min-h-10 rounded-full bg-gold px-4 text-sm font-extrabold text-charcoal" aria-label={t('toggleLanguage')}>
+          <button type="button" onClick={() => setLanguage(language === 'en' ? 'gu' : 'en')} className="min-h-11 rounded-full bg-gold px-4 text-sm font-extrabold text-charcoal" aria-label={t('toggleLanguage')}>
             {language === 'en' ? 'ગુજરાતી' : 'English'}
           </button>
         </div>
       </div>
     </header>
     <Routes>
-      <Route path="/" element={<Placeholder titleKey="homeTitle" route="/" />} />
-      <Route path="/join" element={<Placeholder titleKey="joinTitle" route="/join" />} />
+      <Route path="/" element={<HomePage />} />
+      <Route path="/join" element={<JoinQueuePage />} />
       <Route path="/status/:id" element={<Placeholder titleKey="statusTitle" route="/status/:id" />} />
       <Route path="/reception" element={<Placeholder titleKey="receptionTitle" route="/reception" />} />
       <Route path="/barber/:name" element={<Placeholder titleKey="barberTitle" route="/barber/:name" />} />

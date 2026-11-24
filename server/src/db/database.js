@@ -27,7 +27,7 @@ export async function initializeDatabase() {
       name TEXT NOT NULL UNIQUE,
       avatar TEXT NOT NULL,
       is_on_duty INTEGER NOT NULL DEFAULT 1 CHECK (is_on_duty IN (0, 1)),
-      status TEXT NOT NULL CHECK (status IN ('free', 'busy', 'break'))
+      status TEXT NOT NULL CHECK (status IN ('free', 'busy', 'on_break'))
     );
     CREATE TABLE IF NOT EXISTS salon_settings (
       id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -51,13 +51,14 @@ const seedServices = [
 const seedBarbers = [
   ['Ravi', '👨🏽‍🦱', 1, 'free'],
   ['Amit', '👨🏻‍🦱', 1, 'busy'],
-  ['Imran', '🧔🏽', 1, 'break'],
+  ['Imran', '🧔🏽', 1, 'on_break'],
 ];
 
 function seedTableIfEmpty(table, columns, values) {
   const count = Number(db.exec(`SELECT COUNT(*) FROM ${table}`)[0]?.values?.[0]?.[0] ?? 0);
   if (count) return;
-  const statement = db.prepare(`INSERT INTO ${table} (${columns}) VALUES (${values.map(() => '?').join(', ')})`);
+  const placeholders = Array.from({ length: columns.split(',').length }, () => '?').join(', ');
+  const statement = db.prepare(`INSERT INTO ${table} (${columns}) VALUES (${placeholders})`);
   try { for (const row of values) statement.run(row); }
   finally { statement.free(); }
 }
