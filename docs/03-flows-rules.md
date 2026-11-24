@@ -1,139 +1,123 @@
 # Flows & Rules
 
-## Main flow
-1. Student adds items on Menu -> Cart -> enters name + roll no. -> Place Order
-2. Student sees token #42 on Order Status (status: Placed)
-3. Order appears in the NEW column on the Kitchen Board
-4. Kitchen taps Start -> Preparing; customer page updates by itself
-5. Kitchen taps Ready -> TV shows #42 under "Ready to Collect"; student's phone
-   turns green
-6. Student collects; counter taps Collected -> token leaves the TV and the
-   kitchen board
-7. Owner marks an item Sold out -> the customer menu shows it greyed out
+## Flow: remote customer
+1. Opens Home -> Join -> picks Haircut + "Any barber" -> gets S-14, 6th in line
+2. Watches My Status from home; at 2nd in line sees "Start coming"
+3. Receptionist taps Call next on Amit's card -> S-14 becomes Called
+4. Customer's phone shows "It's your turn! Go to Amit"; TV flashes S-14
+5. Amit taps Start (In chair), then Done -> S-14 leaves the queue
 
-## Order statuses
-- Placed -> Preparing -> Ready -> Collected. Never backwards, never skipping.
-- Kitchen board names: NEW (= Placed), PREPARING, READY.
-- Customer can cancel only while the status is Placed.
-- Invalid status changes are rejected by the BACKEND with a clear error,
-  not just hidden in the frontend.
+## Flow: walk-in
+Receptionist taps + Add walk-in -> name, phone, services, barber -> joins the
+same queue at the end (first come, first served).
 
-## Token rules
-- Token numbers start from 1 every day and increase by 1 for each order.
-- Tokens are never reused on the same day, even if an order is cancelled.
-- Duplicate submissions (double tap, repeated request) must create only one order.
+## Statuses
+- Waiting -> Called -> In chair -> Done. Never backwards, never skipping.
+- Waiting -> Cancelled (by the customer or the receptionist).
+- Called -> No-show (by the receptionist, only after 10 minutes of being Called).
+- Done, Cancelled and No-show are final.
+- Invalid status changes are rejected by the BACKEND with a clear error.
+
+## Tokens
+- Tokens look like S-1, S-2... and restart from S-1 every IST day.
+- Tokens are never reused on the same day, even after cancel or no-show.
+- Duplicate submissions (double tap, repeated request) create only one spot. The
+  client sends a unique request ID; the same ID returns the existing spot.
+
+## Who is next ("Call next")
+- First come, first served.
+- Call next for barber X picks the earliest Waiting customer who chose X or "Any".
+- A customer who chose Ravi is never given to another barber.
+- Call next is allowed only if barber X is Available and has no Called or
+  In chair customer. A barber on break cannot be called for.
+- A barber has only one customer in the chair at a time.
+- If two staff tap Call next at once, only one customer is called and the other
+  request gets a clear error (no double-calling the same customer).
 
 ## Waiting time
-- Estimated wait = about 5 minutes per order ahead of you (orders that are
-  Placed or Preparing with a smaller token). Rough estimate only.
+- "Any barber" customer: (total service minutes of Waiting customers ahead +
+  remaining minutes of customers currently Called or In chair) ÷ number of
+  barbers working.
+- Customer who chose a specific barber: use only that barber's own queue
+  (customers ahead who chose that barber, plus that barber's current customer).
+- Round up to the next 5 minutes. Show "You're next" when the wait is 0.
+- Rough estimate only. It goes down as customers finish.
 
-## Order rules
-- Max 10 of any one item per order (checked on frontend AND backend).
-- Student name and roll number are required.
-- Cart must have at least one item.
-- The backend calculates the total from current prices. It never trusts the
-  browser's total.
-- Sold-out or deleted items cannot be ordered. If an item in the cart goes
-  Sold out, show a message and remove it.
-- No orders after 4:45 PM (canteen closes 5 PM): show "Ordering closed".
-  The backend rejects such orders too.
+## Joining rules
+- Phone number: exactly 10 digits. Name required.
+- 1 to 3 services; only services that are switched on can be chosen.
+- One active spot per phone number (Waiting, Called or In chair). A second try
+  shows the existing spot.
+- The backend calculates total minutes and price from current service data and
+  stores a snapshot of each service name, minutes and price on the spot.
+- Online joining is closed when the owner switches the queue to Closed, or
+  within 30 minutes of closing time. Walk-ins by reception are allowed until
+  closing time.
+- Opening hours: 10:00 AM to 9:00 PM IST (change to your own). The backend
+  decides open/closed using IST; the frontend only shows what the backend says.
+- If the chosen barber is on break: the customer sees "Ravi is on break" and
+  stays in the queue.
+- If a barber is switched off duty while customers waiting for them exist, those
+  customers see a message and the receptionist can move them to "Any".
+
+## No-show and cancel
+- Called but not arrived in 10 minutes -> receptionist can mark No-show.
+- If a no-show customer arrives later, they are added again at the END with a
+  NEW token. The old spot stays as No-show.
+- Cancel is only possible while Waiting.
+- Cancelled and No-show customers are not counted as served in today's stats.
+
+## Staff PIN
+- /reception, /barber/:name and /admin need the staff PIN (env var STAFF_PIN).
+  The backend rejects staff actions without it. The PIN is a simple shared code,
+  not a login system.
+- Customers screens and /display are public.
+
+## Time and old spots
+- All time rules use Asia/Kolkata (SALON_TIMEZONE), never the server's local
+  time. "Today" means the current IST calendar day.
+- Spots from a previous day are hidden from Reception, Barber View and TV, stay
+  in the database, and open read-only on /status/:id with a banner.
 
 ## Realtime and persistence
-- All screens update automatically (Socket.IO), within ~5 seconds at most.
-- All orders and menu items are saved in SQLite. They survive a page refresh
-  and a backend restart.
-- If Socket.IO disconnects, the screen reconnects and shows the latest data.
+- All screens update automatically through Socket.IO, within about 5 seconds.
+- If Socket.IO disconnects, show "Reconnecting...", poll every 5 seconds, and
+  refetch the latest data on reconnect.
+- Spots, services and barbers are stored in SQLite and survive a backend restart.
+  (On Render's free tier the file is wiped on restart; the seed data returns.)
+- Sound and vibration are best-effort and fail silently if blocked.
 
-## Edge cases
-- Empty cart -> Place Order disabled
-- Missing name or roll no. -> error shown, order not placed
-- Quantity above 10 -> blocked with a message
-- Sold-out item in cart -> message shown, item removed
-- Order placed after 4:45 PM -> "Ordering closed"
-- Unknown order id -> "Order not found"
-- Refresh during an active order -> same order and status still shown
-- Two or more browser windows open -> all stay in sync
+## Languages
+- Every label comes from the English/Gujarati language file. The choice is
+  remembered. Long Gujarati text must not overflow.
 
 ## Test checklist
-[ ] Add 3 items, place order -> get token, total is correct
-[ ] Second and third orders get sequential tokens (#2, #3)
-[ ] Empty cart -> Place Order button is disabled
-[ ] Name or roll no. missing -> error shown, order not placed
-[ ] Quantity above 10 is blocked (frontend and backend)
-[ ] New order appears on the Kitchen Board without refresh
-[ ] Start/Ready on kitchen board -> customer page updates by itself
-[ ] Ready token appears on the TV and animates for 5 seconds
-[ ] Collected order disappears from kitchen board and TV
-[ ] Cannot move an order backwards or skip a status (test via backend too)
-[ ] Cancel works only while Placed
-[ ] Mark item Sold out -> greyed out on Menu immediately
-[ ] Sold-out item in cart -> message shown, item removed
-[ ] Order after 4:45 PM -> "Ordering closed", backend rejects it
-[ ] Double-clicking Place Order creates only one order
-[ ] Refreshing Order Status keeps the same order
-[ ] Orders and menu changes survive a backend restart
-[ ] Token numbers restart from 1 on a new day
-[ ] Admin add, edit, delete work and summary cards are correct
-[ ] Whole flow works on a phone screen (390px)
-[ ] Two browser windows (customer + kitchen) stay in sync
+[ ] Join with 2 services -> correct total time and price shown
+[ ] Phone with fewer or more than 10 digits is rejected (frontend and backend)
+[ ] Selecting a 4th service is blocked
+[ ] Same phone joins twice -> shown the existing spot, no duplicate
+[ ] Double-clicking Confirm creates only one spot
+[ ] Tokens are sequential (S-1, S-2...) and restart on a new day
+[ ] Call next for Amit skips a customer who chose Ravi
+[ ] Call next picks the earliest customer who chose Amit or Any
+[ ] Call next is blocked for a barber who is busy or on break
+[ ] Call next -> customer's phone shows "It's your turn" within 5 s
+[ ] Start/Done on Barber View updates Reception, TV and customer page
+[ ] Invalid status changes (backwards, skipping) are rejected by the backend
+[ ] No-show is blocked before 10 minutes; after that it works
+[ ] No-show, then re-add -> goes to the end of the queue with a new token
+[ ] Cancel works only while Waiting
+[ ] Closing online queue -> Join button disabled with message; walk-ins still work
+[ ] Within 30 min of closing -> online join closed
+[ ] Staff screens reject a wrong PIN, and the backend rejects staff actions without it
+[ ] Turning a service off hides it from Join
+[ ] Language toggle switches all labels to Gujarati, with no overflow
+[ ] Waiting time goes down as customers finish
+[ ] Refreshing My Status keeps the same spot
+[ ] Phone, tablet and TV windows all stay in sync
 [ ] Socket.IO disconnect -> reconnect recovers the latest state
-
-## Time and timezone
-- All time rules use the canteen timezone: Asia/Kolkata (IST), set by env var
-  CANTEEN_TIMEZONE. Never use the server's local time (Render servers run UTC).
-- "Today" for token reset and summary cards = the current IST calendar day.
-- Ordering cutoff is checked by the backend at the moment the order is submitted.
-  Before 4:45:00 PM = accepted. After = rejected, even if the cart was open earlier.
-
-## Cancellation
-- Cancelled is a final status. Only the customer can cancel, only while Placed.
-  Staff have no cancel button in the MVP.
-- Cancelled orders disappear from the Kitchen Board and the TV. Their token is
-  never reused. They are NOT counted in the summary cards.
-- Realtime: a cancel is broadcast like any other status change.
-
-## Duplicate submissions and refresh
-- The cart creates a unique request ID (UUID) for each order attempt. If the
-  backend gets the same ID again, it returns the existing order instead of
-  creating a new one.
-- The order id is in the URL (/order/:id). The last order id is also saved in
-  the browser (localStorage) so the student can get back to it.
-
-## Waiting time details
-- Wait = 5 min x number of orders ahead (Placed or Preparing, smaller token).
-- If 0 orders ahead, show "You're next". Hide the estimate once Ready.
-
-## Summary cards
-- Orders today = non-cancelled orders placed today.
-- Items sold = total quantity across those orders.
-- Top-selling item = highest total quantity; if tied, show the first alphabetically.
-- Order records store the item name and price at the time of ordering, so
-  deleted or edited menu items don't change past orders.
-
-## Menu item rules
-- Categories are fixed (Snacks, Meals, Beverages, Desserts); the owner picks one.
-- Name required (max 50 chars). Price is a whole rupee amount from 1 to 999.
-  Description optional (max 120 chars).
-
-## Sound, vibration and connection
-- Sound and vibration are best-effort. If the browser blocks them, fail silently.
-- If Socket.IO disconnects, show a small "Reconnecting..." note, refetch the
-  latest data on reconnect, and poll every 5 seconds while disconnected.
+[ ] Spots and settings survive a backend restart (locally)
 
 ## Testing
-- Use Vitest for backend business-logic tests. Time must be injectable
-  (a clock function) so cutoff and daily-reset tests don't depend on the real clock.
-
-## Opening hours and old orders
-- Ordering is open from 9:00 AM to 4:45 PM IST (change 9 AM to your canteen's
-  real opening time). The backend decides open/closed using IST time; the
-  frontend only displays what the backend says (e.g. GET /api/status).
-- At the start of each new IST day, any active order from a previous day
-  (Placed, Preparing or Ready) is hidden from the Kitchen Board and TV.
-  It stays in the database.
-
-- If a student opens an order from a previous day, /order/:id shows the order
-  read-only with the banner "This order is from a previous day." It keeps its
-  last saved status. The database status is not changed. There is no Cancel
-  button, no estimated wait and no live updates for it.
-- Previous-day orders are not counted in today's summary cards.
+- Use Vitest for backend queue-logic tests. Time must be injectable so closing
+  time, 10-minute no-show and daily-reset tests don't depend on the real clock.
