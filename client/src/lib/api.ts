@@ -49,6 +49,8 @@ async function sendJson<T>(path: string, method: string, body?: unknown): Promis
 export const submitOrder = (body: { requestId: string; studentName: string; rollNumber: string; items: { id: number; quantity: number }[] }) => sendJson<{ order: Order; duplicate: boolean }>('/api/orders', 'POST', body);
 export const fetchOrder = (id: string) => getJson<{ order: Order }>(`/api/orders/${encodeURIComponent(id)}`);
 export const cancelOrder = (id: string) => sendJson<{ order: Order }>(`/api/orders/${encodeURIComponent(id)}/cancel`, 'POST');
+export const fetchKitchenOrders = () => getJson<{ orders: Order[] }>('/api/kitchen');
+export const updateOrderStatus = (id: string, status: 'Preparing' | 'Ready' | 'Collected') => sendJson<{ order: Order }>(`/api/orders/${encodeURIComponent(id)}/status`, 'POST', { status });
 
 export function fetchMenu() {
   return getJson<{ categories: string[]; items: MenuItem[] }>('/api/menu');

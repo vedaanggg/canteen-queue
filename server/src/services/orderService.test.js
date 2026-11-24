@@ -76,4 +76,50 @@ describe('order service', () => {
     expect(api.getOrder(oldOrder.id)).toMatchObject({ isPreviousDay: true, readOnly: true, ordersAhead: null, status: 'Placed' });
     expect(() => api.cancelOrder(oldOrder.id)).toThrow(/Previous-day/);
   });
+  it('allows only the next forward status at each step', () => {
+    const api = service(); const order = api.createOrder(payload()).order;
+    expect(api.updateStatus(order.id, 'Preparing').status).toBe('Preparing');
+    expect(api.updateStatus(order.id, 'Ready').status).toBe('Ready');
+    expect(api.updateStatus(order.id, 'Collected').status).toBe('Collected');
+  });
+  it('rejects backwards and skipped transitions with a clear error', () => {
+    const api = service(); const order = api.createOrder(payload()).order;
+    expect(() => api.updateStatus(order.id, 'Ready')).toThrow(/Only the next forward status/i);
+    api.updateStatus(order.id, 'Preparing');
+    expect(() => api.updateStatus(order.id, 'Placed')).toThrow(/Target status/i);
+    expect(() => api.updateStatus(order.id, 'Collected')).toThrow(/Only the next forward status/i);
+  });
+  it('rejects changes from Cancelled and Collected final statuses', () => {
+    const api = service(); const cancelled = api.createOrder(payload()).order;
+    api.cancelOrder(cancelled.id);
+    expect(() => api.updateStatus(cancelled.id, 'Preparing')).toThrow(/final/i);
+    const collected = api.createOrder(payload()).order;
+    api.updateStatus(collected.id, 'Preparing'); api.updateStatus(collected.id, 'Ready'); api.updateStatus(collected.id, 'Collected');
+    expect(() => api.updateStatus(collected.id, 'Ready')).toThrow(/final/i);
+  });
+  it('rejects status changes on previous-day orders', () => {
+    const api = service(); const oldOrder = api.createOrder(payload()).order;
+    now = new Date('2026-11-25T05:00:00.000Z');
+    expect(() => api.updateStatus(oldOrder.id, 'Preparing')).toThrow(/Previous-day orders cannot be changed/i);
+  });
+  it('allows only one concurrent duplicate action and returns a conflict to the other', async () => {
+    const api = service(); const order = api.createOrder(payload()).order;
+    const results = await Promise.allSettled([
+      Promise.resolve().then(() => api.updateStatus(order.id, 'Preparing')),
+      Promise.resolve().then(() => api.updateStatus(order.id, 'Preparing')),
+    ]);
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.find((result) => result.status === 'rejected');
+    expect(rejected?.status).toBe('rejected');
+    if (rejected?.status === 'rejected') expect(rejected.reason.code).toBe('STATUS_CONFLICT');
+    expect(api.getOrder(order.id).status).toBe('Preparing');
+  });
+  it('returns only current-day active orders for the kitchen', () => {
+    const api = service(); const first = api.createOrder(payload()).order;
+    const second = api.createOrder(payload()).order;
+    api.updateStatus(second.id, 'Preparing');
+    expect(api.getKitchenOrders().map((order) => order.id)).toEqual([first.id, second.id]);
+    api.cancelOrder(first.id);
+    expect(api.getKitchenOrders().map((order) => order.id)).toEqual([second.id]);
+  });
 });

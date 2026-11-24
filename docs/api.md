@@ -24,9 +24,10 @@ remain marked planned.
 | GET | `/api/health` | Confirm the backend and SQLite are available. Returns `{ "status": "ok", "service": "canteen-queue-api" }`. | Implemented in Step 1 |
 | GET | `/api/status` | Return ordering availability and current canteen time. | Implemented |
 | GET | `/api/menu` | Return menu items, including sold-out items, and categories. | Implemented |
+| GET | `/api/kitchen` | Return today's active Placed, Preparing, and Ready orders with item snapshots. | Implemented |
 | POST | `/api/orders` | Create an order with a UUID idempotency request ID; validates availability/open hours and calculates prices/totals on the server. | Implemented |
 | GET | `/api/orders/:id` | Return order details, saved status, queue estimate and previous-day read-only flags. | Implemented |
-| PATCH | `/api/orders/:id/status` | Advance an order through valid staff status transitions. | Planned |
+| POST | `/api/orders/:id/status` | Advance exactly one forward status step; rejects stale, invalid, final, and previous-day changes. | Implemented |
 | POST | `/api/orders/:id/cancel` | Cancel an order only while status is Placed. | Implemented |
 | GET/POST/PATCH/DELETE | `/api/admin/menu-items` | List, add, edit, or delete menu items. | Planned |
 | GET | `/api/admin/summary` | Return today's order count, item quantity total, and top seller. | Planned |
@@ -50,12 +51,10 @@ remain marked planned.
 | Server → client | `connection:ready` | `{ connected: true }` | Confirm the realtime connection. | Implemented in Step 1 |
 | Server → clients | `menu:updated` | Updated menu item or menu snapshot (to be finalized with menu API). | Refresh menu views after owner changes. | Planned |
 | Server → clients | `order:created` | `{ id, status, tokenNumber, serviceDay }` | Notify connected order and kitchen views. | Implemented |
-| Server → clients | `order:updated` | Updated order summary/status. | Synchronize kitchen, tracking, and display views. | Planned |
+| Server → clients | `order:updated` | `{ id, tokenNumber, status, serviceDay }` | Synchronize kitchen, tracking, and display views. | Implemented |
 | Server → clients | `order:cancelled` | `{ id, status, tokenNumber, serviceDay }` | Notify connected order and kitchen views. | Implemented |
 
-Order create/cancel events carry a compact summary object as shown above. The
-`order:updated` event remains planned until staff order status controls are
-implemented.
+Order create/cancel/status events carry compact summary objects as shown above.
 
 ## Implemented response shapes
 
@@ -114,8 +113,22 @@ orders the last saved status is returned with `isPreviousDay: true`,
 Placed order to the final status Cancelled. Other statuses and previous-day
 orders are rejected. Token numbers are not reused after cancellation.
 
+### Kitchen Board
+
+`GET /api/kitchen` returns `{ orders }` for the current `CANTEEN_TIMEZONE`
+calendar day, ordered by token. Each order includes its ID, token, student
+name, status, creation time, and item name/quantity snapshots. Only Placed,
+Preparing, and Ready orders are included.
+
+`POST /api/orders/:id/status` accepts `{ "status": "Preparing" | "Ready" |
+"Collected" }` and returns `{ order }`. Only the next step is allowed:
+Placed → Preparing → Ready → Collected. Unknown orders return 404; invalid,
+backward, skipped, final-status, and previous-day transitions return clear
+errors. Repeating an action after another window already advanced the order
+returns a 409 `STATUS_CONFLICT`. Successful transitions emit `order:updated`
+with `{ id, tokenNumber, status, serviceDay }` so connected clients refetch
+current order details.
+
 The frontend calls these endpoints through `VITE_API_URL`. Order Status listens
 for `order:created`, `order:updated`, and `order:cancelled`; while Socket.IO is
-disconnected it refreshes current-day orders every five seconds. `order:updated`
-is subscribed for the later Kitchen Board implementation; no staff status
-mutation endpoint is available in this step.
+disconnected it refreshes current-day orders every five seconds.

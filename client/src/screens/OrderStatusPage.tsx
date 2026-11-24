@@ -57,8 +57,8 @@ export default function OrderStatusPage() {
   return <main className="mx-auto max-w-3xl px-4 pb-12 pt-6 sm:px-6 sm:pt-10">
     {order.readOnly && <div role="status" className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 font-bold text-amber-950">This order is from a previous day.</div>}
     {!order.readOnly && !connected && <p role="status" className="mb-4 text-sm font-semibold text-orange-800">Reconnecting…</p>}
-    <section className="overflow-hidden rounded-3xl border border-orange-100 bg-white shadow-sm">
-      <div className="bg-orange-500 px-5 py-8 text-center text-white sm:py-10">
+    <section className={`overflow-hidden rounded-3xl border bg-white shadow-sm ${order.status === 'Ready' ? 'border-emerald-200' : 'border-orange-100'}`}>
+      <div className={`${order.status === 'Ready' ? 'bg-emerald-600' : 'bg-orange-500'} px-5 py-8 text-center text-white sm:py-10`}>
         <p className="text-sm font-bold uppercase tracking-[0.2em]">Your token</p>
         <p className="mt-1 text-[min(36vh,18rem)] font-black leading-none" aria-label={`Token ${order.tokenNumber}`}>{order.tokenNumber}</p>
         <p className="mt-3 text-xl font-extrabold">{order.status}</p>

@@ -90,5 +90,30 @@ export function createOrderService({ database, persist = persistDatabase, clock 
       return getOrder(id);
     } catch (error) { try { db.run('ROLLBACK'); } catch {} throw error; }
   }
-  return { createOrder, getOrder, cancelOrder };
+  function getKitchenOrders() {
+    const db = getDb(); const current = clock(); const today = dayFor(current, timezone);
+    return rows(db, "SELECT * FROM orders WHERE service_day = ? AND status IN ('Placed', 'Preparing', 'Ready') ORDER BY token_number", [today])
+      .map((row) => shapeOrder(db, row, current, timezone));
+  }
+  function updateStatus(id, targetStatus) {
+    const db = getDb(); const now = clock();
+    const next = { Placed: 'Preparing', Preparing: 'Ready', Ready: 'Collected' };
+    if (!['Preparing', 'Ready', 'Collected'].includes(targetStatus)) throw new OrderError('Target status must be Preparing, Ready, or Collected.', 400, 'INVALID_TARGET_STATUS');
+    db.run('BEGIN IMMEDIATE');
+    try {
+      const row = rows(db, 'SELECT * FROM orders WHERE id = ?', [id])[0];
+      if (!row) throw new OrderError('Order not found.', 404, 'ORDER_NOT_FOUND');
+      if (row.service_day !== dayFor(now, timezone)) throw new OrderError('Previous-day orders cannot be changed.', 409, 'ORDER_READ_ONLY');
+      if (row.status === 'Cancelled' || row.status === 'Collected') throw new OrderError(`Order is already ${row.status}; that status is final.`, 409, 'FINAL_STATUS');
+      if (next[row.status] !== targetStatus) {
+        if (row.status === targetStatus) throw new OrderError('This order was already advanced in another window. Refresh the board and continue from its current status.', 409, 'STATUS_CONFLICT');
+        throw new OrderError(`Cannot move an order from ${row.status} to ${targetStatus}. Only the next forward status is allowed.`, 409, 'INVALID_STATUS_TRANSITION');
+      }
+      db.run('UPDATE orders SET status = ?, updated_at = ? WHERE id = ? AND status = ?', [targetStatus, now.toISOString(), id, row.status]);
+      if (db.getRowsModified() !== 1) throw new OrderError('This order changed in another window. Refresh the board before trying again.', 409, 'STATUS_CONFLICT');
+      db.run('COMMIT'); persist();
+      return getOrder(id);
+    } catch (error) { try { db.run('ROLLBACK'); } catch {} throw error; }
+  }
+  return { createOrder, getOrder, cancelOrder, getKitchenOrders, updateStatus };
 }

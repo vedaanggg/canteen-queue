@@ -13,3 +13,9 @@
 
 body { margin: 0; min-width: 320px; min-height: 100vh; }
 * { box-sizing: border-box; }
+
+@keyframes kitchen-slide-in {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.kitchen-slide-in { animation: kitchen-slide-in 280ms ease-out both; }

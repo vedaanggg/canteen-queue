@@ -4,6 +4,7 @@ import { socket } from './lib/socket';
 import CartPage from './screens/CartPage';
 import MenuPage from './screens/MenuPage';
 import OrderStatusPage from './screens/OrderStatusPage';
+import KitchenPage from './screens/KitchenPage';
 import { CartProvider } from './state/CartContext';
 import { CanteenDataProvider } from './state/CanteenDataContext';
 
@@ -91,7 +92,7 @@ function AppShell() {
         <Route path="/" element={<MenuPage />} />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/order/:id" element={<OrderStatusPage />} />
-        <Route path="/kitchen" element={<PlaceholderPage title="Kitchen board" />} />
+        <Route path="/kitchen" element={<KitchenPage />} />
         <Route path="/display" element={<PlaceholderPage title="Now serving" />} />
         <Route path="/admin" element={<PlaceholderPage title="Menu manager" />} />
         <Route path="*" element={<PlaceholderPage title="Page not found" />} />

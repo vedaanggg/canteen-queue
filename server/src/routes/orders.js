@@ -19,10 +19,22 @@ ordersRouter.get('/orders/:id', (request, response) => {
   try { response.json({ order: service.getOrder(request.params.id) }); }
   catch (error) { handleError(error, response); }
 });
+ordersRouter.post('/orders/:id/status', (request, response) => {
+  try {
+    const order = service.updateStatus(request.params.id, request.body?.status);
+    request.app.locals.io?.emit('order:updated', eventSummary(order));
+    response.json({ order });
+  } catch (error) { handleError(error, response); }
+});
 ordersRouter.post('/orders/:id/cancel', (request, response) => {
   try {
     const order = service.cancelOrder(request.params.id);
     request.app.locals.io?.emit('order:cancelled', eventSummary(order));
     response.json({ order });
   } catch (error) { handleError(error, response); }
+});
+
+ordersRouter.get('/kitchen', (_request, response) => {
+  try { response.json({ orders: service.getKitchenOrders() }); }
+  catch (error) { handleError(error, response); }
 });
