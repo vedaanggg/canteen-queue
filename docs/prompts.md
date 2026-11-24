@@ -93,3 +93,43 @@ daily token reset, and tell me exactly what you tested.
 
 Update docs/api.md. Test all interactions, including the 10-item limit and the
 closed state. List the changed files and test commands.
+
+---
+## Project switch note
+Prompts above this line were for a canteen project. I misread my assignment and
+started the wrong project, so the project is now the Salon Queue Management
+System. The deployment setup (GitHub, Render, Vercel) was reused.
+---
+
+## Salon project
+
+### Prompt S1: understanding check (no code)
+Read AGENTS.md and everything in docs/. The old docs and code in this repo were
+for a different project (a canteen app). Do not write any code yet.
+1. Tell me in your own words the rules you will follow.
+2. Summarise the salon app in 8 bullet points.
+3. List anything unclear, missing or contradictory in the docs.
+4. List which existing files and folders in client/ and server/ are canteen-specific
+   (menu, orders, kitchen, tokens) and which are the generic scaffold (setup,
+   health check, Socket.IO, env handling, vercel.json) that can be kept.
+
+### Prompt S2: assumptions
+For every unclear, missing or contradictory point you listed, choose the most
+sensible default that fits the docs and keeps the MVP simple. Add them to a new
+"Assumptions" section at the end of docs/03-flows-rules.md, one line each. Do
+not change anything else in the docs. Then show me the list of assumptions.
+Do not write any code yet.
+
+### Prompt S3: cleanup and setup (Step 1)
+Implement Step 1 for the salon app only. Keep the generic scaffold (React +
+Vite + TypeScript + Tailwind, Express, SQLite, Socket.IO, env handling,
+vercel.json, health check, test setup). Remove all canteen-specific code, tests,
+tables and docs (menu, cart, orders, kitchen, canteen routes and strings).
+Rename CANTEEN_TIMEZONE to SALON_TIMEZONE and add STAFF_PIN to the env handling
+and .env.example files. Then set up: placeholder pages for all 7 screens (/,
+/join, /status/:id, /reception, /barber/:name, /display, /admin) with a
+temporary nav bar, the charcoal #1F2937 + gold #D4A017 theme, and an English /
+Gujarati language file with a toggle that is remembered in the browser. Rewrite
+docs/api.md for the salon app (plan only, no features yet). Do not build any
+real screens. Verify the build, the health check and the existing tests, and
+list changed files, deleted files and test commands. Do not deploy anything.
