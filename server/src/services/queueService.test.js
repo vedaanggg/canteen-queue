@@ -147,6 +147,18 @@ describe('real customer queue', () => {
     expect(database.exec("SELECT status FROM barbers WHERE id = 1")[0].values[0][0]).toBe('free');
   });
 
+  it('lets a No-show customer rejoin at the end with a new token', () => {
+    const first = create({ phone: '9876543210', barber: 'Ravi' }).spot;
+    expect(first.token).toBe('S-1');
+    rules.callNext(1);
+    now = new Date(now.getTime() + 10 * 60_000);
+    expect(rules.markNoShow(first.id)).toMatchObject({ status: 'No-show', token: 'S-1' });
+
+    const rejoined = create({ phone: '9876543210', barber: 'Ravi' }).spot;
+    expect(rejoined).toMatchObject({ token: 'S-2', status: 'Waiting', phone: '9876543210' });
+    expect(rejoined.id).not.toBe(first.id);
+  });
+
   it('returns the reception view for today only with current barber and waiting times', () => {
     const waiting = create({ barber: 'Ravi' }).spot;
     now = new Date(now.getTime() + 22 * 60_000);
