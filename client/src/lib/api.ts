@@ -15,11 +15,11 @@ export interface QueueSpot {
   assignedBarber?: string | null; statusUpdatedAt?: string; startedAt?: string | null; finishedAt?: string | null;
   status: QueueSpotStatus; services: Array<{ sourceServiceId: number; nameEn: string; nameGu: string; durationMinutes: number; price: number }>;
   totalMinutes: number; totalPrice: number; createdAt: string; previousDay: boolean; readOnly: boolean;
-  position: number | null; waitingCount: number; expectedWaitMinutes: number | null; isBarberOnBreak: boolean;
+  position: number | null; waitingCount: number; expectedWaitMinutes: number | null; isBarberOnBreak: boolean; isBarberUnavailable?: boolean;
 }
 export interface QueueSpotResponse { spot: QueueSpot; existing?: boolean; message?: string }
 export interface ReceptionEntry extends QueueSpot {
-  preferredBarber: string; waitingMinutes: number | null; minutesWaited: number; statusMinutes: number; canMarkNoShow: boolean;
+  preferredBarber: string; preferredBarberUnavailable?: boolean; waitingMinutes: number | null; minutesWaited: number; statusMinutes: number; canMarkNoShow: boolean;
   services: Array<QueueSpot['services'][number] & { quantity: number }>;
 }
 export interface ReceptionBarber {
@@ -29,6 +29,8 @@ export interface ReceptionBarber {
 export interface ReceptionData { date: string; barbers: ReceptionBarber[]; waitingList: ReceptionEntry[]; called: ReceptionEntry[]; inChair: ReceptionEntry[] }
 export interface BarberView { barber: { id: number; name: string; avatar: string; status: 'free' | 'busy' | 'on_break'; currentCustomer: ReceptionEntry | null }; nextCustomer: ReceptionEntry | null }
 export interface DisplayData { date: string; barbers: Array<{ id: number; name: string; avatar: string; status: 'on_break' | 'in_chair' | 'called' | 'free'; currentToken: string | null }>; upNext: Array<{ id: string; token: string; name: string; barber: string; expectedWaitMinutes: number | null }> }
+export interface AdminSettings { date: string; services: Array<SalonService & { isOn: boolean }>; barbers: Array<{ id: number; name: string; avatar: string; isOnDuty: boolean; status: Barber['status'] }>; queueOpen: boolean; stats: { served: number; noShows: number; averageWaitMinutes: number } }
+export interface AdminServiceInput { nameEn: string; nameGu: string; durationMinutes: number; price: number; isOn?: boolean }
 export class ApiError extends Error {
   constructor(message: string, public status: number, public code?: string) { super(message); }
 }
@@ -75,6 +77,13 @@ export const barberStartCustomer = (token: string, id: string, barberId: number)
 export const barberFinishCustomer = (token: string, id: string, barberId: number) => staffRequest<QueueSpotResponse>(`/api/queue/${encodeURIComponent(id)}/done`, token, 'POST', { barberId });
 export const setBarberBreak = (token: string, barberId: number, onBreak: boolean) => staffRequest<{ barber: { id: number; name: string; status: string } }>(`/api/barbers/${barberId}/break`, token, 'POST', { onBreak });
 export const fetchDisplay = (signal?: AbortSignal) => requestJson<DisplayData>('/api/display', signal);
+export const fetchAdminSettings = (token: string) => staffRequest<AdminSettings>('/api/admin', token);
+export const createAdminService = (token: string, body: AdminServiceInput) => staffRequest<{ service: AdminSettings['services'][number] }>('/api/admin/services', token, 'POST', body);
+export const updateAdminService = (token: string, id: number, body: AdminServiceInput) => staffRequest<{ service: AdminSettings['services'][number] }>(`/api/admin/services/${id}`, token, 'PATCH', body);
+export const toggleAdminService = (token: string, id: number, isOn: boolean) => staffRequest<{ service: AdminSettings['services'][number] }>(`/api/admin/services/${id}/state`, token, 'PATCH', { isOn });
+export const setAdminBarberDuty = (token: string, id: number, onDuty: boolean) => staffRequest<{ barber: { id: number; name: string; isOnDuty: boolean; status: string } }>(`/api/admin/barbers/${id}/duty`, token, 'PATCH', { onDuty });
+export const setAdminQueueOpen = (token: string, open: boolean) => staffRequest<{ queueOpen: boolean; status: SalonStatus }>('/api/admin/queue', token, 'PATCH', { open });
+export const moveWaitingCustomerToAny = (token: string, id: string) => staffRequest<{ spot: { id: string; token: string; name: string; barber: string; status: string } }>(`/api/admin/queue/${encodeURIComponent(id)}/move-to-any`, token, 'POST');
 export const createWalkIn = (token: string, body: { name: string; phone: string; serviceIds: number[]; barber: string; requestId: string }) => staffRequest<QueueSpotResponse>('/api/reception/walk-in', token, 'POST', body);
 export const callNextCustomer = (token: string, barberId: number) => staffRequest<QueueSpotResponse>('/api/reception/call-next', token, 'POST', { barberId });
 export const cancelWaitingCustomer = (token: string, id: string) => staffRequest<QueueSpotResponse>(`/api/reception/${encodeURIComponent(id)}/cancel`, token, 'POST');

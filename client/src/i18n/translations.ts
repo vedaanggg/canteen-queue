@@ -31,6 +31,15 @@ const english = {
   currentCustomerLabel: 'Current customer', serviceTimer: 'Time in chair', barberLoginHint: 'Enter the staff PIN to open your barber view.',
   displayNow: 'Now', upNext: 'Up next', expectedAt: 'Expected in', displayFree: 'Free', displayEmpty: 'No customers are waiting right now.',
   displayNoBarbers: 'No barbers are on duty right now.',
+  adminLoginHint: 'Enter the staff PIN to manage salon settings.', adminServices: 'Services', adminBarbers: 'Barbers on duty today', adminQueue: 'Online joining',
+  queueOpen: 'Open', queueClosed: 'Closed', adminStats: 'Today’s stats', customersServed: 'Customers served', averageWaitToday: 'Average wait to start', noShowsToday: 'No-shows',
+  addService: 'Add service', editService: 'Edit service', serviceNameEn: 'English name', serviceNameGu: 'Gujarati name', serviceMinutes: 'Minutes', servicePrice: 'Price in rupees',
+  serviceEnabled: 'On', serviceDisabled: 'Off', serviceToggle: 'Turn service on or off', barberDutyToggle: 'Switch barber on or off duty', save: 'Save', close: 'Close',
+  adminLoading: 'Loading owner settings…', adminLoadError: 'Could not load owner settings.', adminEmptyServices: 'No services yet. Add your first service.',
+  serviceNameRequired: 'Enter both service names.', serviceNameTooLong: 'Each service name must be 50 characters or fewer.', serviceDurationRange: 'Duration must be a whole number from 5 to 180 minutes.', servicePriceRange: 'Price must be a whole rupee amount from ₹1 to ₹9,999.', duplicateServiceName: 'A service with this English name already exists.',
+  barberBusyOffDuty: 'A barber cannot be switched off duty while a customer is Called or In chair.', barberNotAvailableToday: 'is not available today.', moveToAny: 'Move to Any', moveSuccess: 'Customer moved to Any barber.',
+  queueSwitch: 'Allow online joining', serviceSaved: 'Service saved.', serviceAdded: 'Service added.', settingsSaved: 'Settings saved.',
+  offDuty: 'Off duty',
 } as const;
 
 export type TranslationKey = keyof typeof english;
@@ -68,6 +77,15 @@ export const translations: Record<Language, Dictionary> = {
     currentCustomerLabel: 'હાલના ગ્રાહક', serviceTimer: 'ખુરશીમાં સમય', barberLoginHint: 'વાળંદ દૃશ્ય ખોલવા સ્ટાફ પિન લખો.',
     displayNow: 'હાલ', upNext: 'આગળ', expectedAt: 'અંદાજે', displayFree: 'ખાલી', displayEmpty: 'હાલ કોઈ ગ્રાહક રાહ જોતો નથી.',
     displayNoBarbers: 'અત્યારે કોઈ વાળંદ ફરજ પર નથી.',
+    adminLoginHint: 'સેલોન સેટિંગ્સ માટે સ્ટાફ પિન લખો.', adminServices: 'સેવાઓ', adminBarbers: 'આજના ફરજ પરના વાળંદ', adminQueue: 'ઓનલાઇન જોડાવું',
+    queueOpen: 'ખુલ્લું', queueClosed: 'બંધ', adminStats: 'આજના આંકડા', customersServed: 'સેવા લીધેલા ગ્રાહકો', averageWaitToday: 'શરૂ થવા સુધીની સરેરાશ રાહ', noShowsToday: 'ગેરહાજરી',
+    addService: 'સેવા ઉમેરો', editService: 'સેવા બદલો', serviceNameEn: 'અંગ્રેજી નામ', serviceNameGu: 'ગુજરાતી નામ', serviceMinutes: 'મિનિટ', servicePrice: 'રૂપિયામાં કિંમત',
+    serviceEnabled: 'ચાલુ', serviceDisabled: 'બંધ', serviceToggle: 'સેવા ચાલુ કે બંધ કરો', barberDutyToggle: 'વાળંદને ફરજ પર મૂકો કે દૂર કરો', save: 'સાચવો', close: 'બંધ કરો',
+    adminLoading: 'માલિક સેટિંગ્સ લોડ થઈ રહી છે…', adminLoadError: 'માલિક સેટિંગ્સ લોડ થઈ શકી નથી.', adminEmptyServices: 'હજુ કોઈ સેવા નથી. પહેલી સેવા ઉમેરો.',
+    serviceNameRequired: 'બંને ભાષામાં સેવાનું નામ લખો.', serviceNameTooLong: 'દરેક સેવાનું નામ 50 અક્ષર અથવા ઓછું હોવું જોઈએ.', serviceDurationRange: 'સમય 5 થી 180 મિનિટ વચ્ચે પૂર્ણાંક હોવો જોઈએ.', servicePriceRange: 'કિંમત ₹1 થી ₹9,999 વચ્ચે પૂર્ણ રૂપિયા હોવા જોઈએ.', duplicateServiceName: 'આ અંગ્રેજી નામની સેવા પહેલેથી છે.',
+    barberBusyOffDuty: 'ગ્રાહક બોલાવેલો હોય કે ખુરશીમાં હોય ત્યારે વાળંદને ફરજ પરથી દૂર કરી શકાતા નથી.', barberNotAvailableToday: 'આજે ઉપલબ્ધ નથી.', moveToAny: 'કોઈપણ વાળંદને આપો', moveSuccess: 'ગ્રાહકને કોઈપણ વાળંદ માટે ખસેડ્યો.',
+    queueSwitch: 'ઓનલાઇન જોડાવાની મંજૂરી', serviceSaved: 'સેવા સાચવી.', serviceAdded: 'સેવા ઉમેરી.', settingsSaved: 'સેટિંગ્સ સાચવી.',
+    offDuty: 'ફરજ પર નથી',
   },
 };
 

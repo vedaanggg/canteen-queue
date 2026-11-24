@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { fetchBarbers, fetchSalonServices, fetchSalonStatus, type Barber, type SalonService, type SalonStatus } from '../lib/api';
+import { socket } from '../lib/socket';
 
 export function useSalonData() {
   const [services, setServices] = useState<SalonService[]>([]);
@@ -7,6 +8,7 @@ export function useSalonData() {
   const [status, setStatus] = useState<SalonStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [connected, setConnected] = useState(socket?.connected ?? false);
 
   const refresh = useCallback(async (signal?: AbortSignal) => {
     setLoading(true); setError(null);
@@ -29,5 +31,20 @@ export function useSalonData() {
     return () => window.clearInterval(timer);
   }, []);
 
-  return { services, barbers, status, loading, error, refresh };
+  useEffect(() => {
+    const live = socket; if (!live) { setConnected(false); return; }
+    const refreshCatalog = () => void refresh();
+    const onConnect = () => { setConnected(true); void refresh(); };
+    const onDisconnect = () => setConnected(false);
+    live.on('salon:updated', refreshCatalog); live.on('connect', onConnect); live.on('disconnect', onDisconnect);
+    setConnected(live.connected);
+    return () => { live.off('salon:updated', refreshCatalog); live.off('connect', onConnect); live.off('disconnect', onDisconnect); };
+  }, [refresh]);
+  useEffect(() => {
+    if (connected) return;
+    const timer = window.setInterval(() => { void refresh(); }, 5000);
+    return () => window.clearInterval(timer);
+  }, [connected, refresh]);
+
+  return { services, barbers, status, loading, error, connected, refresh };
 }

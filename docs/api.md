@@ -2,8 +2,7 @@
 
 This API evolves incrementally. The health check, salon catalog, opening and
 joining status, queue estimate, customer joining, status, cancellation,
-Reception, Barber View and Waiting Area Display are implemented. Owner Settings
-remain planned.
+Reception, Barber View, Waiting Area Display and Owner Settings are implemented.
 
 ## Environment
 
@@ -40,7 +39,13 @@ remain planned.
 | POST | `/api/queue/:id/done` | Assigned barber moves In chair to Done and records finish time. | Implemented; staff token required |
 | POST | `/api/barbers/:id/break` | Set an on-duty barber to `on_break` or `free`; active Called/In chair customers block break. | Implemented; staff token required |
 | GET | `/api/display` | Public today-only barber state and next five Waiting tokens with wait estimates. | Implemented |
-| GET/POST/PATCH/DELETE | `/api/admin/*` | Salon services, barber, and setting management. | Planned |
+| GET | `/api/admin` | Return all services, all barbers, online joining switch, and today's stats. | Implemented; staff token required |
+| POST | `/api/admin/services` | Add a service after validating bilingual names, duration, price, and duplicate English names. | Implemented; staff token required |
+| PATCH | `/api/admin/services/:id` | Edit service details without deleting prior snapshots. | Implemented; staff token required |
+| PATCH | `/api/admin/services/:id/state` | Turn a service on or off. | Implemented; staff token required |
+| PATCH | `/api/admin/barbers/:id/duty` | Switch a barber on or off duty; active Called/In chair assignments block off-duty. | Implemented; staff token required |
+| PATCH | `/api/admin/queue` | Persist the online joining Open/Closed switch. | Implemented; staff token required |
+| POST | `/api/admin/queue/:id/move-to-any` | Move an eligible Waiting customer's unavailable barber preference to Any. | Implemented; staff token required |
 
 The Join screen creates spots through `POST /api/queue`. Reception can call a
 Waiting spot and mark it No-show after 10 minutes. Barber View handles In chair
@@ -74,10 +79,12 @@ backend restart. If `STAFF_PIN` is unset, login returns HTTP 503.
 | --- | --- | --- | --- |
 | Server → client | `connection:ready` | `{ "connected": true }` | Implemented |
 | Server → clients | `queue:updated` | Status changes: `{ action, id, token, status }`; barber changes: `{ action: "barber", barberId, barberName, status }` | Implemented for join, cancel, call-next, no-show, start, done and break |
-| Server → clients | `salon:updated` | To be defined with salon settings requirements. | Planned |
+| Server → clients | `salon:updated` | `{ action, ...settingDetails }` for service, barber duty, queue switch and preference changes. | Implemented |
 
 Socket.IO CORS uses `CLIENT_ORIGIN`; the browser connects through
-`VITE_API_URL`. No salon settings events are emitted yet.
+`VITE_API_URL`. Settings changes also emit a compatibility `queue:updated`
+event with `action: "settings"` so Home, Join, Reception, Barber View, TV and
+My Status refetch promptly.
 
 ## Implemented response rules
 
@@ -179,3 +186,31 @@ only today's on-duty barbers and up to five Waiting spots, with each barber's
 status (`called`, `in_chair`, `free`, or `on_break`) and `currentToken`, plus the
 next tokens' expected wait estimates. The TV flashes and attempts a short chime
 when it receives a Called event; sound failure is ignored.
+
+All `/api/admin/*` endpoints require `Authorization: Bearer <token>`. The
+`GET /api/admin` response is `{ date, services, barbers, queueOpen, stats }`;
+services include on/off state and barbers include today's duty state. Stats are
+IST-day-only: `served` counts Done, `noShows` counts No-show, and
+`averageWaitMinutes` averages minutes between `created_at` and `started_at` for
+spots that started. Cancelled spots do not count as served.
+
+`POST /api/admin/services` accepts `{ nameEn, nameGu, durationMinutes, price,
+isOn? }`. Both names are required and at most 50 characters; English names are
+unique ignoring case. Duration must be an integer from 5–180 and price an
+integer from ₹1–₹9,999. `PATCH /api/admin/services/:id` edits the same fields;
+`PATCH /api/admin/services/:id/state` accepts `{ isOn }`. There is no delete
+operation, so existing queue service snapshots remain unchanged. Disabled
+services are excluded from the customer and Reception catalogs and rejected for
+new spots.
+
+`PATCH /api/admin/barbers/:id/duty` accepts `{ onDuty }`. Turning a barber off
+duty is rejected while they own a same-day Called or In chair spot. Waiting
+customers who selected that barber remain in line and get an unavailable flag;
+Reception can call the Move to Any action through
+`POST /api/admin/queue/:id/move-to-any`, which only accepts a same-day Waiting
+spot whose selected barber is off duty.
+
+`PATCH /api/admin/queue` accepts `{ open }` and persists it in
+`salon_settings.online_joining_enabled`. The existing `queueRulesService.js`
+applies this switch with opening hours and the 30-minute cutoff. It disables
+online joining while leaving walk-ins available during salon hours.

@@ -115,8 +115,9 @@ export function createQueueRulesService({
     const today = getSalonDayKey(clock(), timezone);
     const services = query(getDatabase(), 'SELECT source_service_id AS sourceServiceId, name_en AS nameEn, name_gu AS nameGu, duration_minutes AS durationMinutes, price FROM queue_entry_services WHERE queue_entry_id = ? ORDER BY id', [spot.id]);
     const previousDay = spot.token_day !== today;
-    const metrics = previousDay ? { position: null, waitingCount: 0, expectedWaitMinutes: null, isBarberOnBreak: false } : calculateWait({ barber: spot.barber, targetId: spot.id, totalMinutes: Number(spot.total_minutes), createdAt: spot.created_at });
-    return { id: String(spot.id), token: spot.token, tokenNumber: Number(spot.token_number), tokenDay: spot.token_day, name: spot.name, phone: spot.phone, barber: spot.barber, assignedBarber: spot.assigned_barber ?? null, status: spot.status, services, totalMinutes: Number(spot.total_minutes), totalPrice: Number(spot.total_price), createdAt: spot.created_at, statusUpdatedAt: spot.status_updated_at, startedAt: spot.started_at ?? null, finishedAt: spot.finished_at ?? null, previousDay, readOnly: previousDay, ...metrics };
+    const metrics = previousDay ? { position: null, waitingCount: 0, expectedWaitMinutes: null, isBarberOnBreak: false, isBarberUnavailable: false } : calculateWait({ barber: spot.barber, targetId: spot.id, totalMinutes: Number(spot.total_minutes), createdAt: spot.created_at });
+    const isBarberUnavailable = !previousDay && spot.barber.toLowerCase() !== 'any' && !query(getDatabase(), 'SELECT 1 FROM barbers WHERE lower(name) = lower(?) AND is_on_duty = 1', [spot.barber]).length;
+    return { id: String(spot.id), token: spot.token, tokenNumber: Number(spot.token_number), tokenDay: spot.token_day, name: spot.name, phone: spot.phone, barber: spot.barber, assignedBarber: spot.assigned_barber ?? null, status: spot.status, services, totalMinutes: Number(spot.total_minutes), totalPrice: Number(spot.total_price), createdAt: spot.created_at, statusUpdatedAt: spot.status_updated_at, startedAt: spot.started_at ?? null, finishedAt: spot.finished_at ?? null, previousDay, readOnly: previousDay, isBarberUnavailable, ...metrics };
   }
 
   function getReceptionData() {
@@ -126,7 +127,7 @@ export function createQueueRulesService({
       const services = spot.services.map((service) => ({ nameEn: service.nameEn, nameGu: service.nameGu, durationMinutes: service.durationMinutes, price: service.price, quantity: 1 }));
       const waitedMinutes = Math.max(0, Math.floor((now.getTime() - new Date(entry.created_at).getTime()) / 60_000));
       const statusMinutes = Math.max(0, Math.floor((now.getTime() - new Date(entry.status_updated_at).getTime()) / 60_000));
-      return { ...spot, services, preferredBarber: entry.barber, waitingMinutes: entry.status === 'Waiting' ? waitedMinutes : null, minutesWaited: waitedMinutes, statusMinutes, canMarkNoShow: entry.status === 'Called' && statusMinutes >= 10 };
+      return { ...spot, services, preferredBarber: entry.barber, preferredBarberUnavailable: entry.barber.toLowerCase() !== 'any' && !query(db, 'SELECT 1 FROM barbers WHERE lower(name) = lower(?) AND is_on_duty = 1', [entry.barber]).length, waitingMinutes: entry.status === 'Waiting' ? waitedMinutes : null, minutesWaited: waitedMinutes, statusMinutes, canMarkNoShow: entry.status === 'Called' && statusMinutes >= 10 };
     });
     const barbers = query(db, 'SELECT id, name, avatar, status, is_on_duty AS isOnDuty FROM barbers WHERE is_on_duty = 1 ORDER BY id').map((barber) => {
       const current = entries.find((entry) => entry.assignedBarber?.toLowerCase() === barber.name.toLowerCase() && ['Called', 'In chair'].includes(entry.status));

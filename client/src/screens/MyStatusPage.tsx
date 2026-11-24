@@ -87,6 +87,7 @@ export default function MyStatusPage() {
       {spot.status === 'Waiting' && spot.position !== null && spot.position <= 2 && !spot.previousDay && <p className="mt-5 rounded-2xl bg-gold px-4 py-3 text-lg font-black text-charcoal">{t('startComing')}</p>}
       {statusMessage && <div className="mt-6">{statusMessage}</div>}
       {spot.isBarberOnBreak && <p className="mt-5 rounded-xl bg-amber-200/10 px-3 py-2 text-sm font-bold text-amber-100">{spot.barber} {t('barberOnBreak')}</p>}
+      {spot.isBarberUnavailable && <p className="mt-5 rounded-xl bg-amber-200/10 px-3 py-2 text-sm font-bold text-amber-100">{spot.barber} {t('barberNotAvailableToday')}</p>}
       <div className="mt-7 border-t border-white/10 pt-5 text-left">
         <h2 className="text-lg font-extrabold">{t('yourDetails')}</h2><p className="mt-2 break-words text-slate-200">{spot.name}</p>
         <div className="mt-3 flex flex-wrap justify-between gap-2 text-sm"><span className="text-slate-400">{t('preferredBarber')}</span><span className="break-words font-bold">{spot.barber.toLowerCase() === 'any' ? t('anyBarberStatus') : spot.barber}</span></div>

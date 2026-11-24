@@ -10,6 +10,7 @@ import MyStatusPage from './screens/MyStatusPage';
 import ReceptionPage from './screens/ReceptionPage';
 import BarberPage from './screens/BarberPage';
 import DisplayPage from './screens/DisplayPage';
+import AdminPage from './screens/AdminPage';
 
 const pages = [
   { path: '/', key: 'home' }, { path: '/join', key: 'join' }, { path: '/status/demo', key: 'status' },
@@ -74,7 +75,7 @@ function AppShell() {
       <Route path="/reception" element={<ReceptionPage />} />
       <Route path="/barber/:name" element={<BarberPage />} />
       <Route path="/display" element={<DisplayPage />} />
-      <Route path="/admin" element={<Placeholder titleKey="adminTitle" route="/admin" />} />
+      <Route path="/admin" element={<AdminPage />} />
       <Route path="*" element={<Placeholder titleKey="notFound" route="*" />} />
     </Routes>
     {!isDisplay && <footer className="mx-auto flex max-w-7xl justify-center px-4 pb-6"><HealthStatus /></footer>}
