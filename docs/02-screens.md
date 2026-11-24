@@ -52,16 +52,74 @@ Staff screens (/reception, /barber/:name, /admin) ask for the staff PIN first.
 - A spot from a previous day is read-only with a banner
 
 ## Screen 4: Reception Dashboard (/reception) — tablet, landscape
-**User:** receptionist.
-- Left: barber cards (name, status, current customer, time left or time since
-  start, [ Call next ])
-- Right: waiting list in order: token, name, phone, services, preferred barber,
-  waiting time, [ No-show ] (for Called customers only) and [ Cancel ]
-- Top: [ + Add walk-in ] opens a quick form (name, phone, services, barber)
-- Customers waiting more than 60 min are highlighted amber
-- Called customers are shown with a timer; [ No-show ] is enabled after 10 min
-- New customers from phones appear without refresh
+**User:** receptionist or owner at the front desk. **Goal:** keep the queue moving
+fairly and never lose track of who is where.
+
+### Access
+- Needs the staff PIN. First visit shows a PIN screen (4-digit input, [ Enter ]).
+  Wrong PIN: "Wrong PIN, try again". The session stays open until Logout or the
+  browser tab closes.
+- Header: salon name, EN | GU toggle, queue status badge (Open / Closed for
+  online joining), live clock in IST, [ Logout ].
+
+### Layout (10-inch tablet, landscape)
+- Left column (about 40%): one card per barber on duty, stacked.
+- Right column (about 60%): the waiting list.
+- Top bar over the right column: [ + Add walk-in ] and a count "6 waiting".
+- On a phone the columns stack: barbers first, then the waiting list.
+
+### Barber card
+- Avatar/emoji, name, status chip: Free (green) · Called (gold) · In chair
+  (blue) · On break (grey).
+- Current customer: token, name, services. Free barbers show "Ready for next".
+- Time info: Called -> "Called 3 min ago"; In chair -> "40% done · 12 min left"
+  as a progress bar (based on the customer's total service minutes).
+- [ Call next ]:
+  - Enabled only if the barber is Free (on duty, not on break, nobody Called or
+    In chair) and an eligible customer exists.
+  - Disabled with a hint otherwise: "Busy", "On break", or "No one waiting for
+    Ravi".
+  - Tapping it calls the earliest Waiting customer who chose this barber or
+    "Any". It never takes a customer who chose another barber.
+  - The card shows a short success note: "Called S-14 Kunal".
+
+### Waiting list
+- Ordered by join time (first come, first served). Columns: token, name, phone,
+  services, preferred barber ("Any" or the barber's name), waited time, estimated
+  wait.
+- Called customers appear at the top in a gold "Called" section with a timer
+  since being called, the barber's name, and [ No-show ].
+  - [ No-show ] is disabled for the first 10 minutes with the hint
+    "Available in 6 min".
+- Waiting customers have [ Cancel ] with a confirmation pop-up ("Cancel S-14
+  Kunal?").
+- Customers waiting more than 60 minutes have an amber background.
+- Customers whose chosen barber is on break show a small "Ravi is on break" tag.
 - Empty state: "No one waiting — walk right in!"
+
+### Add walk-in (side panel)
+- Fields: name, phone (10 digits), services (up to 3), barber ("Any" or a name).
+- Live summary: total minutes, price, expected wait.
+- [ Add to queue ]: disabled while the request runs. On success, the panel
+  closes, the customer appears at the END of the list, and the receptionist sees
+  the new token ("Added S-15").
+- Walk-ins are allowed until closing time, even when online joining is closed.
+- If the phone already has an active spot, show it instead of creating a second
+  one.
+- To re-add a no-show customer, use the same form. They get a new token at the
+  end.
+
+### States and errors
+- Loading skeletons on first load.
+- Backend rejections (conflict, barber busy, too early for no-show) show a clear
+  message in a toast, and the board refreshes.
+- "Reconnecting..." note when the live connection drops; poll every 5 seconds
+  while disconnected and refetch on reconnect.
+- New customers from phones appear without a refresh, with a short highlight.
+
+### Look
+- Charcoal and gold, rounded cards, tap targets at least 44px, large text for
+  tokens. All labels come from the EN/GU file.
 
 ## Screen 5: Barber View (/barber/:name) — phone
 **User:** barber.

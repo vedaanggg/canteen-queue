@@ -93,3 +93,26 @@ daily token reset, and tell me exactly what you tested.
 
 Update docs/api.md. Test all interactions, including the 10-item limit and the
 closed state. List the changed files and test commands.
+Read AGENTS.md and docs/. Build only Screen 4 (Reception Dashboard) at
+/reception from docs/02-screens.md and docs/03-flows-rules.md, plus the staff
+PIN gate. Do not build Barber View, TV or Owner Settings. Do not change other
+screens, except small changes needed so My Status reacts to Called, No-show and
+Cancelled.
+
+Staff PIN:
+- Add POST /api/staff/login that checks STAFF_PIN and returns a token. All staff
+  endpoints (reception actions, and later barber and admin) must reject requests
+  without a valid token, on the BACKEND. /reception shows a PIN screen first;
+  a wrong PIN shows a clear error. Keep the token in sessionStorage. Add a
+  Logout button.
+
+Backend (all queue rules stay in the ONE existing rules module):
+- GET /api/reception: today's barbers with status, current customer and time
+  info, plus the Waiting list in order with token, name, phone, services,
+  preferred barber, waiting time and minutes waited. Previous-day spots are
+  excluded.
+- POST /api/reception/walk-in: same validation, token and phone rules as online
+  joining, but allowed until closing time even when online joining is closed.
+  It joins at the end of the queue.
+- POST /api/reception/call-next with a barber id. The barber must be on duty,
+  Available (not on break) and have no Called or In

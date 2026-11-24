@@ -59,6 +59,16 @@ same queue at the end (first come, first served).
   stays in the queue.
 - If a barber is switched off duty while customers waiting for them exist, those
   customers see a message and the receptionist can move them to "Any".
+## Reception rules
+- All reception actions require the staff token; the backend rejects them without it.
+- Call next is allowed only for a barber who is on duty, not on break, and has no
+  Called or In chair customer.
+- A Called customer's barber stays reserved for them until they are In chair,
+  No-show or Cancelled by staff.
+- Staff can cancel only Waiting customers. Called customers can only become In
+  chair (by the barber) or No-show (by reception after 10 minutes).
+- Two simultaneous Call next requests must never call the same customer or give
+  one barber two customers.
 
 ## No-show and cancel
 - Called but not arrived in 10 minutes -> receptionist can mark No-show.
