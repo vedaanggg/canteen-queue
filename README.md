@@ -1,3 +1,7 @@
+link for site
+https://canteen-queue-five.vercel.app/
+
+
 # Salon Studio
 
 Salon Studio is currently a development scaffold with placeholder routes for
