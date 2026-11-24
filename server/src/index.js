@@ -17,7 +17,7 @@ io.on('connection', (socket) => {
 });
 
 httpServer.listen(config.port, () => {
-  console.log(`Canteen Queue API listening on port ${config.port}`);
+  console.log(`Salon API listening on port ${config.port}`);
 });
 
 function shutdown() {

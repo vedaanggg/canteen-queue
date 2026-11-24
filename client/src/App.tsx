@@ -1,103 +1,76 @@
-import { Link, Route, Routes, useLocation } from 'react-router-dom';
+import { Link, Route, Routes, useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { socket } from './lib/socket';
-import CartPage from './screens/CartPage';
-import MenuPage from './screens/MenuPage';
-import OrderStatusPage from './screens/OrderStatusPage';
-import KitchenPage from './screens/KitchenPage';
-import { CartProvider } from './state/CartContext';
-import { CanteenDataProvider } from './state/CanteenDataContext';
+import { LanguageProvider, useLanguage } from './i18n/LanguageContext';
+import type { TranslationKey } from './i18n/translations';
+import { fetchHealth } from './lib/api';
 
-const apiUrl = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '');
-
-function PlaceholderPage({ title }: { title: string }) {
-  return (
-    <main className="mx-auto flex min-h-[65vh] max-w-3xl flex-col items-center justify-center px-5 text-center">
-      <span className="mb-4 rounded-full bg-orange-100 px-4 py-2 text-sm font-semibold text-orange-700">Canteen Queue · Step 1</span>
-      <h1 className="text-4xl font-bold tracking-tight text-slate-900">{title}</h1>
-      <p className="mt-3 max-w-lg text-slate-600">This is a placeholder for the {title.toLowerCase()} page. Its real screen will be built in a later step.</p>
-    </main>
-  );
-}
+const pages = [
+  { path: '/', key: 'home' }, { path: '/join', key: 'join' }, { path: '/status/demo', key: 'status' },
+  { path: '/reception', key: 'reception' }, { path: '/barber/stylist', key: 'barber' },
+  { path: '/display', key: 'display' }, { path: '/admin', key: 'admin' },
+] as const;
 
 function HealthStatus() {
-  const [status, setStatus] = useState<'checking' | 'online' | 'offline'>('checking');
-
+  const { t } = useLanguage();
+  const [online, setOnline] = useState<boolean | null>(null);
   useEffect(() => {
     socket?.connect();
-    return () => {
-      socket?.disconnect();
-    };
+    return () => { socket?.disconnect(); };
   }, []);
-
   useEffect(() => {
-    if (!apiUrl) {
-      setStatus('offline');
-      return;
-    }
     const controller = new AbortController();
-    fetch(`${apiUrl}/api/health`, { signal: controller.signal })
-      .then((response) => {
-        if (!response.ok) throw new Error('Health check failed');
-        return response.json();
-      })
-      .then(() => setStatus('online'))
-      .catch(() => {
-        if (!controller.signal.aborted) setStatus('offline');
-      });
+    fetchHealth(controller.signal).then(() => setOnline(true)).catch(() => {
+      if (!controller.signal.aborted) setOnline(false);
+    });
     return () => controller.abort();
   }, []);
-
-  const label = status === 'checking' ? 'Checking server…' : status === 'online' ? 'Backend connected' : 'Backend unavailable';
-  return <span className={`text-xs font-medium ${status === 'online' ? 'text-emerald-700' : status === 'offline' ? 'text-red-600' : 'text-slate-500'}`}>{label}</span>;
+  const label = online === null ? t('checking') : online ? t('backendOnline') : t('backendOffline');
+  return <span className={`text-xs font-medium ${online ? 'text-emerald-300' : online === false ? 'text-rose-300' : 'text-slate-300'}`}>{label}</span>;
 }
 
-export default function App() {
-  return (
-    <CanteenDataProvider>
-      <CartProvider>
-        <AppShell />
-      </CartProvider>
-    </CanteenDataProvider>
-  );
+function Placeholder({ titleKey, route }: { titleKey: TranslationKey; route: string }) {
+  const { t } = useLanguage();
+  const { id, name } = useParams();
+  return <main className="mx-auto flex min-h-[65vh] max-w-3xl flex-col items-center justify-center px-5 text-center">
+    <span className="mb-4 rounded-full border border-gold/40 bg-gold/10 px-4 py-2 text-sm font-semibold text-gold">{t('stepBadge')}</span>
+    <h1 className="text-4xl font-bold tracking-tight text-white">{t(titleKey)}</h1>
+    <p className="mt-3 max-w-lg text-slate-300">{t('placeholderCopy')}</p>
+    <p className="mt-5 rounded-lg bg-slate-800 px-3 py-2 font-mono text-sm text-gold">{route}{id ? ` · ${id}` : ''}{name ? ` · ${name}` : ''}</p>
+  </main>;
 }
 
 function AppShell() {
-  const location = useLocation();
-  const isDisplay = location.pathname === '/display';
-  const lastOrderId = localStorage.getItem('canteen-queue-last-order-id');
-  const pages = [
-    { path: '/', label: 'Menu' }, { path: '/cart', label: 'Cart' },
-    { path: lastOrderId ? `/order/${lastOrderId}` : '/order/placeholder', label: 'Order status' },
-    { path: '/kitchen', label: 'Kitchen' }, { path: '/display', label: 'Display' }, { path: '/admin', label: 'Owner' },
-  ];
+  const { language, setLanguage, t } = useLanguage();
+  return <div className="min-h-screen bg-charcoal text-white">
+    <header className="border-b border-white/10 bg-slate-900/70">
+      <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+        <Link className="text-xl font-extrabold tracking-wide text-white" to="/">{t('brand')}</Link>
+        <nav aria-label={t('temporaryNav')} className="flex flex-wrap gap-2">
+          {pages.map((page) => <Link key={page.path} to={page.path} className="rounded-full border border-white/15 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-gold hover:text-gold">{t(page.key)}</Link>)}
+        </nav>
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold uppercase tracking-widest text-slate-400">{t('language')}</span>
+          <button type="button" onClick={() => setLanguage(language === 'en' ? 'gu' : 'en')} className="min-h-10 rounded-full bg-gold px-4 text-sm font-extrabold text-charcoal" aria-label={t('toggleLanguage')}>
+            {language === 'en' ? 'ગુજરાતી' : 'English'}
+          </button>
+        </div>
+      </div>
+    </header>
+    <Routes>
+      <Route path="/" element={<Placeholder titleKey="homeTitle" route="/" />} />
+      <Route path="/join" element={<Placeholder titleKey="joinTitle" route="/join" />} />
+      <Route path="/status/:id" element={<Placeholder titleKey="statusTitle" route="/status/:id" />} />
+      <Route path="/reception" element={<Placeholder titleKey="receptionTitle" route="/reception" />} />
+      <Route path="/barber/:name" element={<Placeholder titleKey="barberTitle" route="/barber/:name" />} />
+      <Route path="/display" element={<Placeholder titleKey="displayTitle" route="/display" />} />
+      <Route path="/admin" element={<Placeholder titleKey="adminTitle" route="/admin" />} />
+      <Route path="*" element={<Placeholder titleKey="notFound" route="*" />} />
+    </Routes>
+    <footer className="mx-auto flex max-w-7xl justify-center px-4 pb-6"><HealthStatus /></footer>
+  </div>;
+}
 
-  return (
-    <div className="min-h-screen bg-orange-50/50">
-      {!isDisplay && (
-        <header className="border-b border-orange-100 bg-white">
-          <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <Link className="text-lg font-extrabold text-slate-900" to="/">🍽️ Canteen Queue</Link>
-            <nav aria-label="Temporary navigation" className="flex flex-wrap gap-2">
-              {pages.map((page) => (
-                <Link key={page.path} to={page.path} className="rounded-full border border-orange-100 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:border-canteen hover:text-orange-700">
-                  {page.label}
-                </Link>
-              ))}
-            </nav>
-          </div>
-        </header>
-      )}
-      <Routes>
-        <Route path="/" element={<MenuPage />} />
-        <Route path="/cart" element={<CartPage />} />
-        <Route path="/order/:id" element={<OrderStatusPage />} />
-        <Route path="/kitchen" element={<KitchenPage />} />
-        <Route path="/display" element={<PlaceholderPage title="Now serving" />} />
-        <Route path="/admin" element={<PlaceholderPage title="Menu manager" />} />
-        <Route path="*" element={<PlaceholderPage title="Page not found" />} />
-      </Routes>
-      {!isDisplay && <footer className="mx-auto flex max-w-6xl justify-center px-4 pb-6"><HealthStatus /></footer>}
-    </div>
-  );
+export default function App() {
+  return <LanguageProvider><AppShell /></LanguageProvider>;
 }

@@ -4,7 +4,8 @@ export default {
   theme: {
     extend: {
       colors: {
-        canteen: '#F97316',
+        charcoal: '#1F2937',
+        gold: '#D4A017',
       },
     },
   },
