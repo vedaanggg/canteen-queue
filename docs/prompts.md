@@ -44,6 +44,49 @@ Frontend:
 - Cart page with student name and roll number validation, and an empty-cart state.
 - Sold-out items greyed out and disabled. "Ordering closed" banner when closed.
 - Loading, error and empty states. Keep the cart if the page is refreshed.
+
+- Implement order placement and Screen 3 (Order Status) from docs/02-screens.md\
+and docs/03-flows-rules.md. Do not build the Kitchen Board, TV display or\
+admin screens yet. Do not touch other screens.\
+\
+Backend:\
+\- Create orders and order_items tables in SQLite. Store each item's name and\
+&#x20; price at the time of ordering.\
+\- POST /api/orders: validate student name, roll number, non-empty cart,\
+&#x20; quantity 1-10 per item, and that every item exists and is available.\
+&#x20; Recalculate the total on the server and ignore any total from the browser.\
+&#x20; Reject orders when ordering is closed (use the existing backend open/closed\
+&#x20; logic). Accept a client-generated request ID (UUID); if the same ID is sent\
+&#x20; again, return the existing order instead of creating a new one.\
+\- Daily token numbers start at 1 each IST day (CANTEEN_TIMEZONE), increase by 1,\
+&#x20; and are never reused, including after cancellation. Token generation must be\
+&#x20; safe against two simultaneous requests. Use an injectable clock so tests\
+&#x20; don't depend on the real time.\
+\- GET /api/orders/:id returns the order, its status, and the number of orders\
+&#x20; ahead (Placed or Preparing, smaller token, same day).\
+\- POST /api/orders/:id/cancel works only while the status is Placed. Cancelled\
+&#x20; is a final status.\
+\- Emit Socket.IO events when an order is created or cancelled.\
+\- Orders from a previous IST day are returned as read-only with a flag.\
+\
+Frontend:\
+\- Place Order sends the request with a UUID created per attempt, disables\
+&#x20; itself while the request is running, and goes to /order/:id on success.\
+&#x20; Clear the cart after success. Show backend errors clearly.\
+\- Build /order/:id: huge token (about a third of the screen height), name and\
+&#x20; items summary, progress steps (Placed -> Preparing -> Ready), estimated wait\
+&#x20; at 5 min per order ahead ("You're next" when 0, hidden once Ready), Cancel\
+&#x20; button only while Placed with a confirmation, Cancelled and Collected\
+&#x20; messages, "Order not found" page, and the previous-day read-only banner.\
+\- Update by itself through Socket.IO, with a polling fallback every 5 seconds\
+&#x20; while disconnected. Show a "Reconnecting..." note when disconnected.\
+\- Save the last order id in localStorage. Refreshing keeps the same order.\
+\
+Write Vitest tests for: sequential tokens, daily reset, duplicate request ID,\
+quantity limit, sold-out rejection, closed-hours rejection, server-side total,\
+and cancel only while Placed. Update docs/api.md. List the changed files and\
+test commands. Test duplicate requests, page refreshes, invalid orders and\
+daily token reset, and tell me exactly what you tested.
 - Mobile-first at 390px, then responsive on laptop. Orange accent #F97316.
 - Place Order only validates the form for now. Real order placement comes in the
   next step, so do not create orders yet.
