@@ -206,6 +206,48 @@ empty states, a "Reconnecting..." note and a 5-second polling fallback. Every
 label from the EN/GU file. Charcoal and gold theme, tap targets at least 44px.
 Disable buttons while requests run.
 
+
+Read AGENTS.md and docs/. The MVP is complete. Act as a senior QA engineer and
+audit the entire app by running it, not just reading the code. Use the test
+checklist in docs/03-flows-rules.md and test every item, then these scenarios.
+
+Main flow:
+1. A customer opens Home, joins with services and a barber, and gets a token.
+2. The customer appears on Reception.
+3. Reception calls next for a free barber, and the customer's page shows "It's
+   your turn" within 5 seconds and the TV flashes the token.
+4. The barber taps Start, then Done, and Reception, the TV and the customer
+   page update.
+5. The wait time for others goes down.
+6. The owner turns a service off and it disappears from Join.
+
+Edge cases: empty or missing name, bad phone numbers (9 and 11 digits, letters),
+no services selected, 4 services, a service turned off after selecting it, the
+same phone joining twice, double-clicking Confirm, closed queue (owner switch),
+online joining within 30 minutes of closing, walk-ins after online joining
+closes, call next for a busy barber and an on-break barber, a Ravi-only customer
+never given to another barber, two staff clicking Call next at once, invalid
+status changes called directly through the API, No-show before and after 10
+minutes, re-adding a no-show (new token at the end), cancel only while Waiting,
+wrong and missing staff PIN on every staff endpoint, daily token reset, previous-day
+spots read-only, page refresh on every screen, backend restart, two or more
+windows, Socket.IO disconnect and reconnect, and English/Gujarati on every screen
+with no overflow or untranslated text.
+
+Final requirements: fix every reproducible bug, verify frontend and backend
+validation, verify SQLite persistence, check responsive layouts (390px phone,
+tablet landscape for /reception, 1920x1080 for /display), make sure there are no
+non-functional buttons, add useful error messages and empty states, make sure no
+localhost URLs are hard-coded, run the production build locally, and add
+automated tests for any critical logic still untested. Do not deploy. Do not
+redesign working screens and do not add features.
+
+Finally provide: (1) the list of implemented features, (2) test results in
+PASS/FAIL with how each was checked, (3) known limitations, (4) exact commands to
+start the app, (5) localhost URLs for all seven screens, (6) remaining bugs. Do
+not claim a feature works unless you actually tested it, and say clearly what you
+could not test.
+
 Write Vitest tests for: service validation (each rule), duplicate names, off
 services excluded from the join list, off-duty barber blocked while busy, Move
 to Any, queue switch blocking online joining but not walk-ins, stats calculation
